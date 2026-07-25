@@ -1,0 +1,14 @@
+# OS noise
+.DS_Store
+Thumbs.db
+desktop.ini
+
+# Python (icon generator)
+__pycache__/
+*.pyc
+
+# Editors / misc
+*.log
+node_modules/
+.vscode/
+.idea/
