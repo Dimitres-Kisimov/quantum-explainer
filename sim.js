@@ -1,0 +1,308 @@
+/*
+ * sim.js — a tiny quantum state-vector simulator for 1 and 2 qubits.
+ * Hand-written for Quantum Explainer (no dependencies, no frameworks).
+ *
+ * Conventions
+ * -----------
+ * - A state is an array of complex amplitudes {re, im} of length 2^n.
+ * - Qubit 0 is the LEFT bit of the ket label: |q0 q1>, basis index = q0*2 + q1.
+ * - All functions are pure: they return new states and never mutate inputs.
+ * - Randomness is a seeded PRNG (mulberry32) so every "run" is reproducible.
+ *   Real quantum hardware is not reproducible shot-by-shot; the seed is a
+ *   teaching convenience, and the app says so.
+ *
+ * Works both as a browser classic script (exposes globalThis.QSim) and as a
+ * CommonJS module for the Node test harness (test/sim.test.mjs).
+ */
+'use strict';
+
+const QSim = (() => {
+
+  /* ---------------- complex numbers ---------------- */
+  const c = (re, im) => ({ re: re, im: im || 0 });
+  const cadd = (a, b) => c(a.re + b.re, a.im + b.im);
+  const csub = (a, b) => c(a.re - b.re, a.im - b.im);
+  const cmul = (a, b) => c(a.re * b.re - a.im * b.im, a.re * b.im + a.im * b.re);
+  const cconj = (a) => c(a.re, -a.im);
+  const cscale = (a, s) => c(a.re * s, a.im * s);
+  const cabs2 = (a) => a.re * a.re + a.im * a.im;
+  const cabs = (a) => Math.sqrt(cabs2(a));
+  const carg = (a) => Math.atan2(a.im, a.re);
+
+  /* ---------------- states ---------------- */
+  const zeroState = (nQubits) => {
+    const dim = 1 << nQubits;
+    const s = new Array(dim);
+    for (let i = 0; i < dim; i++) s[i] = c(i === 0 ? 1 : 0);
+    return s;
+  };
+  const nQubitsOf = (state) => Math.round(Math.log2(state.length));
+  const clone = (state) => state.map((a) => c(a.re, a.im));
+  const tensor = (a, b) => {
+    const out = [];
+    for (let i = 0; i < a.length; i++)
+      for (let j = 0; j < b.length; j++) out.push(cmul(a[i], b[j]));
+    return out;
+  };
+  const norm = (state) => Math.sqrt(state.reduce((t, a) => t + cabs2(a), 0));
+  const probabilities = (state) => state.map(cabs2);
+  const bitstring = (i, n) => i.toString(2).padStart(n, '0');
+  // |<s1|s2>| — 1 means "same state up to a global phase".
+  const fidelity = (s1, s2) => {
+    let acc = c(0);
+    for (let i = 0; i < s1.length; i++) acc = cadd(acc, cmul(cconj(s1[i]), s2[i]));
+    return cabs(acc);
+  };
+  // index of the basis state if the state (numerically) IS one, else -1.
+  const basisIndexOf = (state, eps) => {
+    const e = eps || 1e-9;
+    for (let i = 0; i < state.length; i++) if (cabs2(state[i]) > 1 - e) return i;
+    return -1;
+  };
+
+  /* ---------------- gate matrices (2x2, row major) ---------------- */
+  const R2 = Math.SQRT1_2; // 1/sqrt(2)
+  const GATES = {
+    H: [[c(R2), c(R2)], [c(R2), c(-R2)]],
+    X: [[c(0), c(1)], [c(1), c(0)]],
+    Y: [[c(0), c(0, -1)], [c(0, 1), c(0)]],
+    Z: [[c(1), c(0)], [c(0), c(-1)]],
+    S: [[c(1), c(0)], [c(0), c(0, 1)]],
+    T: [[c(1), c(0)], [c(0), c(Math.cos(Math.PI / 4), Math.sin(Math.PI / 4))]],
+  };
+  const RX = (t) => {
+    const h = t / 2;
+    return [[c(Math.cos(h)), c(0, -Math.sin(h))], [c(0, -Math.sin(h)), c(Math.cos(h))]];
+  };
+  const RY = (t) => {
+    const h = t / 2;
+    return [[c(Math.cos(h)), c(-Math.sin(h))], [c(Math.sin(h)), c(Math.cos(h))]];
+  };
+  const RZ = (t) => {
+    const h = t / 2;
+    return [[c(Math.cos(h), -Math.sin(h)), c(0)], [c(0), c(Math.cos(h), Math.sin(h))]];
+  };
+  const ROTATIONS = { RX: RX, RY: RY, RZ: RZ };
+
+  /* ---------------- applying gates ---------------- */
+  // Apply a 2x2 matrix m to `target` (0-based, qubit 0 = left bit).
+  function applySingle(state, m, target) {
+    const n = nQubitsOf(state);
+    const mask = 1 << (n - 1 - target);
+    const out = clone(state);
+    for (let i = 0; i < state.length; i++) {
+      if ((i & mask) !== 0) continue;
+      const j = i | mask;
+      const a0 = state[i], a1 = state[j];
+      out[i] = cadd(cmul(m[0][0], a0), cmul(m[0][1], a1));
+      out[j] = cadd(cmul(m[1][0], a0), cmul(m[1][1], a1));
+    }
+    return out;
+  }
+
+  // CNOT: flip `target` exactly in the branches where `control` is 1.
+  function applyCNOT(state, control, target) {
+    const n = nQubitsOf(state);
+    const cm = 1 << (n - 1 - control);
+    const tm = 1 << (n - 1 - target);
+    const out = clone(state);
+    for (let i = 0; i < state.length; i++) out[i] = (i & cm) ? state[i ^ tm] : state[i];
+    return out;
+  }
+
+  // op: {gate:'H'|'X'|'Y'|'Z'|'S'|'T', target}
+  //   | {gate:'RX'|'RY'|'RZ', target, angle}   (angle in radians)
+  //   | {gate:'CNOT', control, target}
+  function applyOp(state, op) {
+    if (op.gate === 'CNOT') return applyCNOT(state, op.control, op.target);
+    if (ROTATIONS[op.gate]) return applySingle(state, ROTATIONS[op.gate](op.angle || 0), op.target);
+    const m = GATES[op.gate];
+    if (!m) throw new Error('unknown gate: ' + op.gate);
+    return applySingle(state, m, op.target);
+  }
+  const runOps = (ops, nQubits) => ops.reduce((s, op) => applyOp(s, op), zeroState(nQubits));
+
+  /* ---------------- measurement (seeded, reproducible) ---------------- */
+  function mulberry32(seed) {
+    let a = seed >>> 0;
+    return function () {
+      a |= 0; a = (a + 0x6D2B79F5) | 0;
+      let t = Math.imul(a ^ (a >>> 15), 1 | a);
+      t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t;
+      return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
+    };
+  }
+  function sampleIndex(probs, r) {
+    let acc = 0;
+    for (let i = 0; i < probs.length; i++) {
+      acc += probs[i];
+      if (r < acc) return i;
+    }
+    return probs.length - 1; // guard against floating-point round-off
+  }
+  // Born rule sampling: outcome i with probability |amplitude_i|^2.
+  function measureShots(state, shots, seed) {
+    const n = nQubitsOf(state);
+    const probs = probabilities(state);
+    const rng = mulberry32(seed);
+    const counts = {};
+    for (let i = 0; i < (1 << n); i++) counts[bitstring(i, n)] = 0;
+    for (let s = 0; s < shots; s++) counts[bitstring(sampleIndex(probs, rng()), n)]++;
+    return { counts: counts, shots: shots, seed: seed };
+  }
+
+  /* ---------------- Bloch sphere ---------------- */
+  // 1-qubit pure state -> Bloch vector (x,y,z) plus angles theta, phi.
+  // x = 2 Re(a* b), y = 2 Im(a* b), z = |a|^2 - |b|^2  (phase-invariant).
+  function blochVector(state) {
+    const inner = cmul(cconj(state[0]), state[1]);
+    const x = 2 * inner.re;
+    const y = 2 * inner.im;
+    const z = cabs2(state[0]) - cabs2(state[1]);
+    const zc = Math.max(-1, Math.min(1, z));
+    const theta = Math.acos(zc);
+    const phi = (Math.abs(x) < 1e-12 && Math.abs(y) < 1e-12) ? 0 : Math.atan2(y, x);
+    return { x: x, y: y, z: z, theta: theta, phi: phi };
+  }
+
+  // Bloch vector of ONE qubit inside a 2-qubit state (partial trace).
+  // Length 1 = pure (unentangled); length < 1 = mixed, i.e. entangled with
+  // the other qubit. which: 0 = left qubit, 1 = right qubit.
+  function reducedBloch(state, which) {
+    const a00 = state[0], a01 = state[1], a10 = state[2], a11 = state[3];
+    let rho01, z;
+    if (which === 0) {
+      rho01 = cadd(cmul(a00, cconj(a10)), cmul(a01, cconj(a11)));
+      z = cabs2(a00) + cabs2(a01) - cabs2(a10) - cabs2(a11);
+    } else {
+      rho01 = cadd(cmul(a00, cconj(a01)), cmul(a10, cconj(a11)));
+      z = cabs2(a00) + cabs2(a10) - cabs2(a01) - cabs2(a11);
+    }
+    const x = 2 * rho01.re;
+    const y = -2 * rho01.im;
+    return { x: x, y: y, z: z, len: Math.sqrt(x * x + y * y + z * z) };
+  }
+
+  /* ---------------- entanglement check (2 qubits) ---------------- */
+  // A 2-qubit pure state factors as (alpha|0>+beta|1>) (x) (gamma|0>+delta|1>)
+  // if and only if  a00*a11 - a01*a10 = 0.  (Rank-1 check on the 2x2
+  // amplitude matrix.)  Concurrence = 2|det|: 0 = product, 1 = maximal.
+  const productDet = (state) => csub(cmul(state[0], state[3]), cmul(state[1], state[2]));
+  const concurrence = (state) => 2 * cabs(productDet(state));
+  const isEntangled = (state, eps) => concurrence(state) > (eps || 1e-9);
+
+  /* ---------------- formatting ---------------- */
+  const fmt = (x, d) => {
+    const dd = (d === undefined) ? 3 : d;
+    let v = x;
+    if (Math.abs(v) < 0.5 * Math.pow(10, -dd)) v = 0; // avoid "-0.000"
+    return v.toFixed(dd);
+  };
+  const fmtComplex = (a, d) => {
+    const dd = (d === undefined) ? 3 : d;
+    const re = Math.abs(a.re) < 0.5 * Math.pow(10, -dd) ? 0 : a.re;
+    const im = Math.abs(a.im) < 0.5 * Math.pow(10, -dd) ? 0 : a.im;
+    return fmt(re, dd) + (im < 0 ? ' - ' : ' + ') + fmt(Math.abs(im), dd) + 'i';
+  };
+  const degOf = (rad) => Math.round(rad * 180 / Math.PI);
+
+  /* ---------------- per-step plain-language explainer ---------------- */
+  // Honest, dynamic text: numbers come from the actual pre/post states.
+  function describeStep(op, pre, post) {
+    const n = nQubitsOf(post);
+    const t = 'q' + op.target;
+    const preBasis = basisIndexOf(pre);
+    const postBasis = basisIndexOf(post);
+
+    if (op.gate === 'H') {
+      let s;
+      if (preBasis >= 0) {
+        s = 'H split ' + t + ' into an equal superposition: the |' + bitstring(preBasis, n) +
+            '⟩ branch became two branches with amplitude 1/√2 ≈ 0.707 each. ' +
+            'This is a definite state — only the measurement outcome is random (50/50 on ' + t + ').';
+      } else if (postBasis >= 0) {
+        s = 'Interference: H recombined the two branches and one path sum cancelled to zero, ' +
+            'leaving the definite state |' + bitstring(postBasis, n) + '⟩.';
+      } else {
+        s = 'H recombined the branches of ' + t + ' — amplitudes were added and subtracted (interference).';
+      }
+      if (n === 1) {
+        const p0 = cmul(c(R2), pre[0]);
+        const p1 = cmul(c(R2), pre[1]);
+        s += ' Path sums: amp(|0⟩) = 0.707·(' + fmtComplex(pre[0]) + ') + 0.707·(' +
+             fmtComplex(pre[1]) + ') = ' + fmtComplex(cadd(p0, p1)) +
+             ';  amp(|1⟩) = 0.707·(' + fmtComplex(pre[0]) + ') − 0.707·(' +
+             fmtComplex(pre[1]) + ') = ' + fmtComplex(csub(p0, p1)) + '.';
+      }
+      return s;
+    }
+    if (op.gate === 'X') {
+      return 'X swapped the |0⟩ and |1⟩ amplitudes of ' + t +
+             ' — a classical NOT applied to the branch labels. Probabilities swap accordingly.';
+    }
+    if (op.gate === 'Y') {
+      return 'Y flipped ' + t + ' like X and also multiplied the branches by ±i — ' +
+             'a bit flip combined with a phase flip.';
+    }
+    if (op.gate === 'Z' || op.gate === 'S' || op.gate === 'T') {
+      const deg = op.gate === 'Z' ? 180 : (op.gate === 'S' ? 90 : 45);
+      return op.gate + ' rotated the phase of ' + t + '’s |1⟩ component by ' + deg +
+             '°. Measurement probabilities are unchanged — a phase is invisible to a ' +
+             'single measurement, but it decides how amplitudes add or cancel later (interference).';
+    }
+    if (op.gate === 'RX' || op.gate === 'RY' || op.gate === 'RZ') {
+      const axis = op.gate.charAt(1).toLowerCase();
+      let s = op.gate + '(' + degOf(op.angle || 0) + '°) rotated ' + t + ' by ' +
+              degOf(op.angle || 0) + '° around the ' + axis + '-axis of the Bloch sphere.';
+      if (op.gate === 'RZ') s += ' Phase-only: probabilities in the 0/1 basis are unchanged.';
+      return s;
+    }
+    if (op.gate === 'CNOT') {
+      const ctl = 'q' + op.control;
+      const detPost = productDet(post);
+      const magPre = cabs(productDet(pre));
+      const magPost = cabs(detPost);
+      let s = 'CNOT flipped ' + t + ' exactly in the branches where ' + ctl + ' is 1. ';
+      const check = 'a₀₀·a₁₁ − a₀₁·a₁₀ = ' +
+                    fmtComplex(detPost) + ' (magnitude ' + fmt(magPost) + ')';
+      if (magPost > 1e-9 && magPre <= 1e-9) {
+        s += 'That entangled the qubits. Product check: ' + check +
+             ' ≠ 0, so the state cannot be written as (α|0⟩+β|1⟩)⊗(γ|0⟩+δ|1⟩). ' +
+             'Neither qubit has a definite state of its own any more.';
+      } else if (magPost <= 1e-9 && magPre > 1e-9) {
+        s += 'That disentangled them: the product check ' + check + ' is back to 0, so the state factors again.';
+      } else if (magPost > 1e-9) {
+        s += 'The qubits remain entangled: product check ' + check + ' ≠ 0.';
+      } else {
+        s += 'The state is still a product state: ' + check + '.';
+      }
+      return s;
+    }
+    return op.gate + ' applied to ' + t + '.';
+  }
+
+  /* ---------------- exports ---------------- */
+  return {
+    // complex
+    c: c, cadd: cadd, csub: csub, cmul: cmul, cconj: cconj, cscale: cscale,
+    cabs: cabs, cabs2: cabs2, carg: carg,
+    // states
+    zeroState: zeroState, nQubitsOf: nQubitsOf, clone: clone, tensor: tensor,
+    norm: norm, probabilities: probabilities, bitstring: bitstring,
+    fidelity: fidelity, basisIndexOf: basisIndexOf,
+    // gates
+    GATES: GATES, RX: RX, RY: RY, RZ: RZ,
+    applySingle: applySingle, applyCNOT: applyCNOT, applyOp: applyOp, runOps: runOps,
+    // measurement
+    mulberry32: mulberry32, sampleIndex: sampleIndex, measureShots: measureShots,
+    // bloch + entanglement
+    blochVector: blochVector, reducedBloch: reducedBloch,
+    productDet: productDet, concurrence: concurrence, isEntangled: isEntangled,
+    // formatting + explainer
+    fmt: fmt, fmtComplex: fmtComplex, degOf: degOf, describeStep: describeStep,
+  };
+})();
+
+/* Browser: expose global. Node (CommonJS): export for the test harness. */
+if (typeof globalThis !== 'undefined') globalThis.QSim = QSim;
+if (typeof module !== 'undefined' && typeof module.exports !== 'undefined') module.exports = QSim;
