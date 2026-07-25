@@ -1,0 +1,123 @@
+# Quantum Explainer
+
+An installable, offline-first web app that teaches the basics of quantum
+computing on a real (tiny) simulator — and refuses to hype.
+
+I built this because most introductory material about quantum computing sits at
+one of two bad extremes: textbook walls of matrices, or breathless marketing
+about "trying every answer at once". Neither helps a curious person build a
+correct intuition. So this app takes the third path: show the actual formalism
+at the only scale where it can be shown completely — one and two qubits — let
+you poke it interactively, and say out loud what quantum computers *cannot* do.
+Every physics claim in the app is either demonstrated live on the simulator or
+cited to a real source (references below and in the app footer).
+
+## What's inside
+
+- **A hand-written state-vector simulator** (`sim.js`, ~300 lines, zero
+  dependencies): complex arithmetic, H/X/Y/Z/S/T gates, RX/RY/RZ rotations
+  with an angle slider, CNOT, Born-rule measurement with a seeded PRNG so runs
+  are reproducible, and an entanglement check (the a₀₀a₁₁ − a₀₁a₁₀ product
+  test). Pure functions, unit-tested in plain Node.
+- **Circuit playground**: click gates to build a 1–2 qubit circuit, see the
+  live amplitudes and probabilities, run 1000 seeded shots, and read a
+  plain-language "why did this happen" entry for every step — with the actual
+  numbers from the state vector, including the explicit non-factorability
+  check when a CNOT entangles the qubits.
+- **An interactive Bloch sphere** (canvas, drag to rotate) with θ/φ readout.
+  In two-qubit mode it draws each qubit's *reduced* state — so you can watch
+  both arrows collapse to the centre of the sphere when the qubits entangle,
+  which is the most honest picture of entanglement I know how to draw.
+- **Learn mode**: short lessons on superposition, measurement, interference
+  (with the cancellation arithmetic written out), entanglement (a Bell-state
+  walkthrough), plus a "What quantum computers are NOT" section covering the
+  parallel-worlds myth, NISQ-era limits, decoherence, error-correction
+  overhead, and why your encryption is not being broken today — and a "where
+  they may genuinely help" section with the asymptotics stated correctly.
+  Every lesson ends with a "try it" button that loads the circuit.
+- **A real PWA**: web app manifest, service worker that precaches the whole
+  shell, install button, original icons. After the first visit it works with
+  no network at all. Light/dark follows your system preference.
+
+There are no frameworks, no build step, no CDNs, no web fonts, no analytics,
+and no network calls. Everything is hand-written HTML/CSS/JS with system fonts
+and inline SVG/canvas graphics.
+
+## Run it
+
+Open `index.html` in a browser and everything works except installation
+(service workers require HTTP). For the full PWA experience serve the folder:
+
+```
+python -m http.server 8000
+# then open http://localhost:8000
+```
+
+**Install on a phone** (needs HTTPS or localhost):
+
+- **Android / desktop Chrome or Edge:** use the "Install app" button in the
+  header when the browser offers it, or the browser menu's Install entry.
+- **iOS / iPadOS:** open in Safari → Share → **Add to Home Screen**.
+
+Once installed (or simply after the first load), the app runs fully offline.
+
+## Verify
+
+Everything is checkable from a stock Node installation:
+
+```
+node --check sim.js app.js sw.js     # syntax
+node test/sim.test.mjs               # 42 physics/behaviour assertions
+node tools/verify.mjs                # manifest, precache, offline guard (57 checks)
+```
+
+The test harness asserts, among other things: H|0⟩ gives 50/50; H·H|0⟩
+returns |0⟩ (interference); CNOT on (H|0⟩)⊗|0⟩ yields the Bell state with
+joint probabilities {00: 0.5, 11: 0.5} and a failing factorability check;
+RY(π) ≈ X up to global phase; seeded measurement is reproducible; and norms
+stay 1 to 1e-10 through long circuits. The verifier proves the app references
+no external asset of any kind.
+
+`tools/make_icons.py` (Python + Pillow) regenerates the PNG icons from the
+same geometry as the hand-drawn `icons/icon.svg`.
+
+## Project layout
+
+```
+index.html            app shell + all lesson content
+styles.css            hand-written styles, light/dark via prefers-color-scheme
+sim.js                the quantum simulator (pure functions, Node-testable)
+app.js                DOM glue: playground, Bloch canvas, histogram, PWA wiring
+manifest.webmanifest  PWA manifest
+sw.js                 service worker (precache-the-shell, cache-first)
+icons/                original icon: SVG source + rasterized PNGs
+test/sim.test.mjs     Node test harness (no framework)
+tools/verify.mjs      structural + offline-guard checks
+tools/make_icons.py   PNG icon generator (Pillow)
+```
+
+Simulator convention: qubit 0 is the left bit of the ket, so |10⟩ means
+q0 = 1, q1 = 0, and basis index = q0·2 + q1.
+
+## References
+
+1. M. A. Nielsen and I. L. Chuang, *Quantum Computation and Quantum
+   Information*, Cambridge University Press (10th anniversary edition, 2010).
+2. J. Preskill, "Quantum Computing in the NISQ era and beyond",
+   Quantum 2, 79 (2018). arXiv:1801.00862.
+3. IBM Quantum Learning, "Basics of quantum information" course materials,
+   learning.quantum.ibm.com (accessed 2026).
+4. C. Gidney and M. Ekerå, "How to factor 2048 bit RSA integers in 8 hours
+   using 20 million noisy qubits", Quantum 5, 433 (2021). arXiv:1905.09749.
+5. C. H. Bennett, E. Bernstein, G. Brassard and U. Vazirani, "Strengths and
+   Weaknesses of Quantum Computing", SIAM J. Comput. 26, 1510 (1997).
+   arXiv:quant-ph/9701001.
+6. P. W. Shor, "Polynomial-Time Algorithms for Prime Factorization and
+   Discrete Logarithms on a Quantum Computer", SIAM J. Comput. 26, 1484
+   (1997). arXiv:quant-ph/9508027.
+7. L. K. Grover, "A fast quantum mechanical algorithm for database search",
+   Proc. 28th ACM STOC (1996). arXiv:quant-ph/9605043.
+
+## License
+
+© 2026 Dimitres Kisimov — all rights reserved; published for portfolio review. See LICENSE.
