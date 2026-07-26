@@ -246,6 +246,52 @@ const CN01 = { gate: 'CNOT', control: 0, target: 1 };
      'stepping through op-by-op matches runOps end-to-end (fidelity 1)');
 }
 
+/* ---------- fractional gates (what the Bloch-sweep animation draws) ---------- */
+{
+  // a generic, unstructured start state to catch phase mistakes
+  const generic = Q.runOps([H0, { gate: 'T', target: 0 }], 1);
+  for (const op of [
+    H0, { gate: 'X', target: 0 }, { gate: 'Y', target: 0 }, { gate: 'Z', target: 0 },
+    { gate: 'S', target: 0 }, { gate: 'T', target: 0 },
+    { gate: 'RX', target: 0, angle: 0.7 }, { gate: 'RY', target: 0, angle: -1.3 },
+    { gate: 'RZ', target: 0, angle: 2.1 },
+  ]) {
+    ok(approx(Q.fidelity(Q.partialOp(generic, op, 0), generic), 1),
+       'partialOp t=0 is the identity for ' + op.gate);
+    ok(approx(Q.fidelity(Q.partialOp(generic, op, 1), Q.applyOp(generic, op)), 1),
+       'partialOp t=1 matches applyOp up to global phase for ' + op.gate);
+  }
+
+  // partial RX is literally RX of the partial angle
+  const half = Q.partialOp(Q.zeroState(1), { gate: 'RX', target: 0, angle: P / 2 }, 0.5);
+  ok(approx(Q.fidelity(half, Q.applyOp(Q.zeroState(1), { gate: 'RX', target: 0, angle: P / 4 })), 1),
+     'partialOp(RX(90 deg), t=0.5) = RX(45 deg)');
+
+  // halfway through H, the Bloch vector is mid-sweep about the (x+z)/sqrt(2)
+  // axis: Rodrigues gives (0.5, -1/sqrt(2), 0.5) from the +z pole
+  const bh = Q.blochVector(Q.partialOp(Q.zeroState(1), H0, 0.5));
+  ok(approx(bh.x, 0.5) && approx(bh.y, -Math.SQRT1_2) && approx(bh.z, 0.5),
+     'partialOp(H, t=0.5) Bloch vector is (0.5, -0.707, 0.5) — mid-sweep, still length 1');
+
+  // norm preserved at an arbitrary fraction
+  ok(approx(Q.norm(Q.partialOp(generic, H0, 0.37)), 1),
+     'partialOp preserves the norm at t=0.37');
+
+  // CNOT: t=1 must be EXACTLY CNOT (phase-corrected), not just fidelity-1
+  const mid = Q.runOps([H0], 2);
+  const bellVia = Q.partialOp(mid, CN01, 1);
+  const bell = Q.applyOp(mid, CN01);
+  ok(bellVia.every((a, i) => approx(a.re, bell[i].re) && approx(a.im, bell[i].im)),
+     'partialOp(CNOT, t=1) equals CNOT amplitude-for-amplitude (relative phase corrected)');
+  ok(approx(Q.fidelity(Q.partialOp(mid, CN01, 0), mid), 1), 'partialOp(CNOT, t=0) is the identity');
+  const plusplus = Q.runOps([H0, { gate: 'H', target: 1 }], 2);
+  const cpp = Q.partialOp(plusplus, CN01, 1);
+  const r0pp = Q.reducedBloch(cpp, 0);
+  ok(approx(r0pp.x, 1) && approx(r0pp.len, 1),
+     'partialOp(CNOT, t=1) on |++>: control stays exactly on +x (no stray control phase)');
+  ok(approx(Q.norm(Q.partialOp(mid, CN01, 0.42)), 1), 'partial CNOT preserves the norm mid-sweep');
+}
+
 /* ---------- summary ---------- */
 console.log('');
 console.log(pass + ' passed, ' + fail + ' failed');

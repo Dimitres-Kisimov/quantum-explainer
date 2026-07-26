@@ -122,6 +122,65 @@ const QSim = (() => {
   }
   const runOps = (ops, nQubits) => ops.reduce((s, op) => applyOp(s, op), zeroState(nQubits));
 
+  /* ---------------- fractional gates (for the Bloch-sweep animation) ----
+   * Every single-qubit gate here is a Bloch-sphere rotation: up to a global
+   * phase, gate = exp(-i·angle/2 · axis·σ). axisAngleOf returns that
+   * decomposition; rotationMatrix builds the partial rotation, so
+   * partialOp(state, op, t) is the state t of the way (t ∈ [0,1]) through
+   * applying op. At t = 1 it equals applyOp up to a global phase, which is
+   * invisible to probabilities and to (reduced) Bloch vectors — exactly what
+   * the animation draws. CNOT is not a single-qubit rotation; it animates as
+   * a controlled partial X with the phase chosen so t = 1 is EXACTLY CNOT
+   * (a relative phase between control branches would be physical, so it is
+   * corrected, not ignored). */
+  function axisAngleOf(op) {
+    switch (op.gate) {
+      case 'X': return { axis: [1, 0, 0], angle: Math.PI };
+      case 'Y': return { axis: [0, 1, 0], angle: Math.PI };
+      case 'Z': return { axis: [0, 0, 1], angle: Math.PI };
+      case 'H': return { axis: [R2, 0, R2], angle: Math.PI };
+      case 'S': return { axis: [0, 0, 1], angle: Math.PI / 2 };
+      case 'T': return { axis: [0, 0, 1], angle: Math.PI / 4 };
+      case 'RX': return { axis: [1, 0, 0], angle: op.angle || 0 };
+      case 'RY': return { axis: [0, 1, 0], angle: op.angle || 0 };
+      case 'RZ': return { axis: [0, 0, 1], angle: op.angle || 0 };
+      default: return null; // CNOT: handled by partialOp directly
+    }
+  }
+  // exp(-i·angle/2 · n·σ) = cos(angle/2)·I − i·sin(angle/2)·(n·σ)
+  function rotationMatrix(axis, angle) {
+    const h = angle / 2, ch = Math.cos(h), sh = Math.sin(h);
+    const nx = axis[0], ny = axis[1], nz = axis[2];
+    return [
+      [c(ch, -sh * nz), c(-sh * ny, -sh * nx)],
+      [c(sh * ny, -sh * nx), c(ch, sh * nz)],
+    ];
+  }
+  function partialOp(state, op, t) {
+    if (op.gate === 'CNOT') {
+      const n = nQubitsOf(state);
+      const cm = 1 << (n - 1 - op.control);
+      const tm = 1 << (n - 1 - op.target);
+      // e^{i·tπ/2}·RX(tπ) on the target in the control-1 branches: identity
+      // at t = 0, exactly X (no stray phase) at t = 1.
+      const ph = c(Math.cos(t * Math.PI / 2), Math.sin(t * Math.PI / 2));
+      const m = rotationMatrix([1, 0, 0], t * Math.PI)
+        .map((row) => row.map((e) => cmul(ph, e)));
+      const out = clone(state);
+      for (let i = 0; i < state.length; i++) {
+        if ((i & tm) !== 0 || (i & cm) === 0) continue;
+        const j = i | tm;
+        const a0 = state[i], a1 = state[j];
+        out[i] = cadd(cmul(m[0][0], a0), cmul(m[0][1], a1));
+        out[j] = cadd(cmul(m[1][0], a0), cmul(m[1][1], a1));
+      }
+      return out;
+    }
+    const aa = axisAngleOf(op);
+    if (!aa) throw new Error('unknown gate: ' + op.gate);
+    return applySingle(state, rotationMatrix(aa.axis, aa.angle * t), op.target);
+  }
+
   /* ---------------- measurement (seeded, reproducible) ---------------- */
   function mulberry32(seed) {
     let a = seed >>> 0;
@@ -293,6 +352,7 @@ const QSim = (() => {
     // gates
     GATES: GATES, RX: RX, RY: RY, RZ: RZ,
     applySingle: applySingle, applyCNOT: applyCNOT, applyOp: applyOp, runOps: runOps,
+    axisAngleOf: axisAngleOf, rotationMatrix: rotationMatrix, partialOp: partialOp,
     // measurement
     mulberry32: mulberry32, sampleIndex: sampleIndex, measureShots: measureShots,
     // bloch + entanglement
