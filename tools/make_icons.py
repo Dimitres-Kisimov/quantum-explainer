@@ -7,8 +7,9 @@ for clean anti-aliasing, then downscales.
 Run from the repo root:  python tools/make_icons.py
 Outputs: icons/icon-512.png, icon-192.png, icon-180.png, maskable-512.png
 """
-from PIL import Image, ImageDraw
 import os
+
+from PIL import Image, ImageDraw
 
 BG = (14, 22, 49, 255)        # #0e1631
 RING = (199, 210, 254, 255)   # #c7d2fe

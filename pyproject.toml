@@ -1,0 +1,15 @@
+# Python tooling config for the two helper scripts (tools/make_icons.py,
+# tools/make_onepager.py). The app itself is dependency-free HTML/CSS/JS.
+
+[project]
+name = "quantum-explainer-tools"
+version = "1.0.0"
+description = "Helper scripts for the Quantum Explainer PWA (icon rasterizer, one-pager builder)"
+requires-python = ">=3.10"
+
+[tool.ruff]
+line-length = 100
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "UP", "B"]
+ignore = ["E501"]
