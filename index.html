@@ -73,10 +73,13 @@
         <button class="gatebtn rot" data-gate="RY" title="Rotate about y by the slider angle">RY</button>
         <button class="gatebtn rot" data-gate="RZ" title="Rotate about z by the slider angle">RZ</button>
       </div>
-      <div class="row angle">
-        <label for="angle" class="lbl">Rotation angle</label>
-        <input type="range" id="angle" min="-360" max="360" step="15" value="90">
-        <output id="angleLabel" for="angle" class="mono">90° (0.50π)</output>
+      <div class="rotgroup">
+        <div class="row angle">
+          <label for="angle" class="lbl">Angle for RX·RY·RZ</label>
+          <input type="range" id="angle" min="-360" max="360" step="15" value="90">
+          <output id="angleLabel" for="angle" class="mono">90° (0.50π)</output>
+        </div>
+        <p class="small muted anglehint">Used only by the three dashed rotation gates, and only when you click one: gates already in the circuit keep the angle they were placed with (shown under each gate box).</p>
       </div>
       <div class="row" id="cnotWrap" hidden>
         <span class="lbl">Two-qubit</span>

@@ -129,6 +129,18 @@ main { max-width: 1180px; margin: 0 auto; padding: 1rem 1.2rem 3rem; }
 }
 .gatebtn:hover { border-color: var(--accent); color: var(--accent); }
 .gatebtn.wide { min-width: 0; padding: 0 0.8rem; font-size: 0.9rem; }
+/* rotation gates: dashed accent border ties them visually to the angle
+   slider group below (which shares the same dashed border + tint) */
+.gatebtn.rot { border: 1.5px dashed var(--accent); background: var(--accent-soft); }
+.rotgroup {
+  border: 1.5px dashed var(--accent);
+  background: var(--accent-soft);
+  border-radius: 10px;
+  padding: 0.15rem 0.6rem 0.4rem;
+  margin: 0.55rem 0;
+}
+.rotgroup .row { margin: 0.4rem 0; }
+.anglehint { margin: 0; }
 .ghost {
   border: 1px solid var(--border);
   background: transparent;
@@ -216,6 +228,26 @@ button:focus-visible, input:focus-visible, .chip:has(input:focus-visible) {
   font-size: 0.85rem;
 }
 .hist .placeholder { color: var(--muted); font-size: 0.85rem; }
+
+/* ---------- transient feedback toast ---------- */
+#toast {
+  position: fixed;
+  left: 50%;
+  bottom: 1.2rem;
+  transform: translateX(-50%) translateY(8px);
+  background: var(--fg);
+  color: var(--bg);
+  padding: 0.55rem 0.95rem;
+  border-radius: 10px;
+  font-size: 0.85rem;
+  max-width: min(92vw, 36rem);
+  text-align: center;
+  opacity: 0;
+  pointer-events: none;
+  z-index: 60;
+  transition: opacity 200ms ease, transform 200ms ease;
+}
+#toast.show { opacity: 1; transform: translateX(-50%) translateY(0); }
 
 /* ---------- learn ---------- */
 .learnwrap { display: grid; gap: 1rem; max-width: 74ch; margin: 0 auto; }

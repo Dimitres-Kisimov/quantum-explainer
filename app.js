@@ -82,13 +82,35 @@ $('clearBtn').addEventListener('click', () => { if (ops.length) { ops = []; reco
 
 document.querySelectorAll('input[name="nq"]').forEach((r) => {
   r.addEventListener('change', () => {
+    const clearedGates = ops.length;
     nQubits = Number(r.value);
     ops = [];
     $('targetWrap').hidden = nQubits === 1;
     $('cnotWrap').hidden = nQubits === 1;
     recompute();
+    if (clearedGates) {
+      toast('Switched to ' + nQubits + ' qubit' + (nQubits === 1 ? '' : 's') +
+            ' — the previous ' + clearedGates + '-gate circuit was cleared (fresh ' +
+            (nQubits === 1 ? '|0⟩' : '|00⟩') + ' start).');
+    }
   });
 });
+
+/* ---------- transient feedback toast ---------- */
+let toastTimer = null;
+function toast(msg) {
+  let t = $('toast');
+  if (!t) {
+    t = document.createElement('div');
+    t.id = 'toast';
+    t.setAttribute('role', 'status');
+    document.body.appendChild(t);
+  }
+  t.textContent = msg;
+  t.classList.add('show');
+  clearTimeout(toastTimer);
+  toastTimer = setTimeout(() => t.classList.remove('show'), 4500);
+}
 
 /* ================= recompute + render ================= */
 function recompute() {
