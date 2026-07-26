@@ -9,6 +9,19 @@ const Q = window.QSim;
 const $ = (id) => document.getElementById(id);
 const SVGNS = 'http://www.w3.org/2000/svg';
 
+/* If sim.js failed to load (e.g. a partial deployment or a stale cache), fail
+ * VISIBLY instead of dying silently with dead buttons. */
+if (!Q) {
+  const d = document.createElement('div');
+  d.setAttribute('role', 'alert');
+  d.style.cssText = 'position:fixed;top:0;left:0;right:0;z-index:99;background:#b91c1c;' +
+    'color:#fff;padding:10px 14px;font:14px/1.4 system-ui,sans-serif;text-align:center';
+  d.textContent = 'The simulator script failed to load - please hard-reload this page ' +
+    '(Ctrl+Shift+R, or close and reopen the tab).';
+  document.body.appendChild(d);
+  return;
+}
+
 /* ================= playground state ================= */
 let nQubits = 1;
 let ops = [];            // [{gate, target, control?, angle?}]
