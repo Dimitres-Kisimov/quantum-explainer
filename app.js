@@ -31,6 +31,8 @@ let lastRunOpsKey = null;
 let measured = null;     // {index, state}: set by "Measure once" (collapse), cleared on any edit
 let viewStep = null;     // step scrubber: null = follow the latest gate; 0..ops.length = view states[k]
 
+let blochAnim = null;    // in-flight Bloch sweep {base, op, from, to, t0} — display only
+
 const current = () => states[states.length - 1];
 const shownStep = () => (viewStep === null ? ops.length : viewStep);
 // What the state panels show: the circuit state at the scrubbed step (the
@@ -76,16 +78,42 @@ document.querySelectorAll('#palette .gatebtn').forEach((b) => {
     if (gate === 'RX' || gate === 'RY' || gate === 'RZ') op.angle = angleRad();
     ops.push(op);
     recompute();
+    animateBloch(states[ops.length - 1], op, 0, 1);
   });
 });
 document.querySelectorAll('#cnotWrap .gatebtn').forEach((b) => {
   b.addEventListener('click', () => {
-    ops.push({ gate: 'CNOT', control: Number(b.dataset.control), target: Number(b.dataset.target) });
+    const op = { gate: 'CNOT', control: Number(b.dataset.control), target: Number(b.dataset.target) };
+    ops.push(op);
     recompute();
+    animateBloch(states[ops.length - 1], op, 0, 1);
   });
 });
-$('undoBtn').addEventListener('click', () => { if (ops.length) { ops.pop(); recompute(); } });
+$('undoBtn').addEventListener('click', () => {
+  if (!ops.length) return;
+  const removed = ops.pop();
+  recompute();
+  // sweep the removed gate backwards; its pre-state is the new final state
+  animateBloch(states[ops.length], removed, 1, 0);
+});
 $('clearBtn').addEventListener('click', () => { if (ops.length) { ops = []; recompute(); } });
+
+// Remove one gate mid-circuit (the × under its column, or the scrub-row
+// button). Later gates are unaffected — they reapply to the recomputed state
+// and the diagram renumbers.
+function removeOpAt(k) {
+  if (k < 0 || k >= ops.length) return;
+  const label = opLabel(ops[k]);
+  ops.splice(k, 1);
+  recompute();
+  toast('Removed step ' + (k + 1) + ' (' + label + ')' +
+        (ops.length
+          ? ' — ' + ops.length + ' gate' + (ops.length === 1 ? '' : 's') + ' left, later steps renumbered.'
+          : ' — the circuit is now empty.'));
+}
+$('stepRemove').addEventListener('click', () => {
+  if (viewStep !== null && viewStep > 0) removeOpAt(viewStep - 1);
+});
 
 document.querySelectorAll('input[name="nq"]').forEach((r) => {
   r.addEventListener('change', () => {
@@ -119,10 +147,44 @@ function toast(msg) {
   toastTimer = setTimeout(() => t.classList.remove('show'), 4500);
 }
 
+/* ---------- Bloch sweep: animate a gate as the rotation it is ----------
+ * partialOp (sim.js) gives the state t of the way through a gate, so the
+ * arrow sweeps along the gate's actual rotation axis instead of teleporting
+ * — RX/RY/RZ visibly rotate about x/y/z, H about the (x+z) diagonal, and a
+ * CNOT sweeps the target flip in the control-1 branches. Display only: the
+ * circuit state, tables, and seeded runs always use the exact final state,
+ * and the last frame snaps to it. Skipped under prefers-reduced-motion. */
+const ANIM_MS = 260;
+function animateBloch(base, op, from, to) {
+  blochAnim = null; // supersede any sweep still in flight
+  // Land on the true state FIRST: the sweep only repaints frames over it, so
+  // the panel is never stale even if animation frames don't run at all.
+  drawBloch();
+  const reduced = window.matchMedia &&
+    window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+  if (!op || reduced || (op.gate !== 'CNOT' && !Q.axisAngleOf(op))) return;
+  const my = blochAnim = { base: base, op: op, from: from, to: to, t0: null };
+  // safety net: if animation frames stall (hidden tab, throttled renderer),
+  // land the sweep on the true state on the wall clock instead
+  setTimeout(() => {
+    if (blochAnim === my) { blochAnim = null; drawBloch(); }
+  }, ANIM_MS + 80);
+  requestAnimationFrame(function frame(now) {
+    if (blochAnim !== my) return; // superseded or cancelled
+    if (my.t0 === null) my.t0 = now;
+    const f = Math.min(1, (now - my.t0) / ANIM_MS);
+    const e = f * f * (3 - 2 * f); // smoothstep
+    drawBloch(Q.partialOp(my.base, my.op, my.from + (my.to - my.from) * e));
+    if (f < 1) requestAnimationFrame(frame);
+    else { blochAnim = null; drawBloch(); } // land exactly on the true state
+  });
+}
+
 /* ================= recompute + render ================= */
 function recompute() {
   measured = null; // any edit discards a single-shot collapse
   viewStep = null; // ...and snaps the step scrubber back to the newest gate
+  blochAnim = null; // ...and cancels any sweep still in flight
   states = [Q.zeroState(nQubits)];
   for (const op of ops) states.push(Q.applyOp(current(), op));
   renderCircuit();
@@ -141,15 +203,25 @@ function recompute() {
  * Scrubbing discards a single-shot collapse — the collapsed state belonged
  * to the step that was showing when it was measured. */
 function scrubTo(k) {
+  const k0 = shownStep();
   viewStep = (k === null || k >= ops.length) ? null : Math.max(0, k);
   measured = null;
+  const k1 = shownStep();
   renderCircuit();
   renderExplain();
   renderAmps();
-  drawBloch();
   renderScrub();
   renderCollapse();
   renderHistPlaceholder();
+  // stepping to an adjacent gate sweeps that gate (backwards for Prev);
+  // longer jumps snap
+  if (Math.abs(k1 - k0) === 1) {
+    const lo = Math.min(k0, k1);
+    animateBloch(states[lo], ops[lo], k1 > k0 ? 0 : 1, k1 > k0 ? 1 : 0);
+  } else {
+    blochAnim = null;
+    drawBloch();
+  }
 }
 function renderScrub() {
   const empty = ops.length === 0;
@@ -160,6 +232,11 @@ function renderScrub() {
   $('stepPrev').disabled = k === 0;
   $('stepNext').disabled = viewStep === null;
   $('stepLatest').disabled = viewStep === null;
+  $('stepRemove').hidden = viewStep === null || viewStep === 0;
+  if (viewStep !== null && viewStep > 0) {
+    $('stepRemove').textContent = 'Remove step ' + viewStep;
+    $('stepRemove').title = 'Delete ' + opLabel(ops[viewStep - 1]) + ' from the circuit';
+  }
   $('scrubLabel').textContent = viewStep === null
     ? 'Showing: after step ' + ops.length + ' of ' + ops.length + ' (latest)'
     : (k === 0
@@ -182,7 +259,7 @@ function renderCircuit() {
   box.textContent = '';
   const colW = 48, x0 = 104;
   const w = Math.max(240, x0 + ops.length * colW + 16);
-  const h = nQubits * 54 + 26;
+  const h = nQubits * 54 + 26 + (ops.length ? 18 : 0); // bottom strip hosts the per-step × controls
   const svg = document.createElementNS(SVGNS, 'svg');
   svg.setAttribute('width', w); svg.setAttribute('height', h);
   svg.setAttribute('viewBox', '0 0 ' + w + ' ' + h);
@@ -264,6 +341,26 @@ function renderCircuit() {
     hit.appendChild(tt);
     hit.addEventListener('click', () => scrubTo(k + 1));
     g.appendChild(hit);
+    // × in the bottom strip: delete just this step (drawn after the column
+    // hit target, so it wins the click)
+    const del = document.createElementNS(SVGNS, 'g');
+    del.setAttribute('class', 'cdel');
+    del.setAttribute('data-del', k + 1);
+    const dtt = document.createElementNS(SVGNS, 'title');
+    dtt.textContent = 'Remove step ' + (k + 1) + ' (' + opLabel(op) + ')';
+    del.appendChild(dtt);
+    const dring = document.createElementNS(SVGNS, 'circle');
+    dring.setAttribute('cx', cx); dring.setAttribute('cy', h - 11); dring.setAttribute('r', 7);
+    dring.setAttribute('class', 'cdelring');
+    del.appendChild(dring);
+    const dx = document.createElementNS(SVGNS, 'text');
+    dx.setAttribute('x', cx); dx.setAttribute('y', h - 7.5);
+    dx.setAttribute('class', 'cdeltext');
+    dx.setAttribute('text-anchor', 'middle');
+    dx.textContent = '×';
+    del.appendChild(dx);
+    del.addEventListener('click', () => removeOpAt(k));
+    g.appendChild(del);
     parent = svg;
   });
   box.appendChild(svg);
@@ -462,7 +559,10 @@ function drawArrow(ctx, pr, v, color, label) {
     ctx.fillText(label, lx, ly);
   }
 }
-function drawBloch() {
+/* sweepState: an intermediate state from animateBloch. drawBloch is also a
+ * resize/theme listener, so anything that isn't a state array (e.g. an Event)
+ * falls through to the real displayed state. */
+function drawBloch(sweepState) {
   const cvs = $('bloch');
   if (!cvs || $('view-playground').hidden) return;
   const rect = cvs.getBoundingClientRect();
@@ -505,7 +605,7 @@ function drawBloch() {
   // state arrows — branch on the ACTUAL state length, never on the nQubits
   // flag, so a mid-update call (e.g. from switchView) can never read past
   // the end of a 1-qubit state.
-  const st = displayState();
+  const st = Array.isArray(sweepState) ? sweepState : displayState();
   if (st.length === 2) {
     const b = Q.blochVector(st);
     drawArrow(ctx, pr, b, acc, null);

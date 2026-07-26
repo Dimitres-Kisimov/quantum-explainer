@@ -109,8 +109,9 @@
         <span id="scrubLabel" class="small mono" aria-live="polite"></span>
         <button id="stepNext" class="ghost" title="View the state one gate later">Next &#9654;</button>
         <button id="stepLatest" class="ghost" title="Follow the newest gate again">Latest</button>
+        <button id="stepRemove" class="ghost" hidden>Remove step</button>
       </div>
-      <p class="small muted" id="scrubHint" hidden>Click a step number in the diagram (or Prev/Next) to replay the state after any gate — the amplitude table, bars, and Bloch arrow all follow. Measuring while scrubbed samples the state you are looking at.</p>
+      <p class="small muted" id="scrubHint" hidden>Click a step number in the diagram (or Prev/Next) to replay the state after any gate — the amplitude table, bars, and Bloch arrow all follow. Measuring while scrubbed samples the state you are looking at. The × under a column deletes just that gate (later steps renumber); when viewing a step, the Remove button does the same.</p>
       <h3>Why did this happen?</h3>
       <p class="small muted">One entry per gate, with the actual numbers from the state vector.</p>
       <ol id="explainList" class="explain"></ol>
@@ -121,7 +122,7 @@
       <p class="small muted">Amplitudes are complex numbers; probability = |amplitude|². The bars are probabilities. Each dial draws its amplitude as an arrow in the complex plane — length is the magnitude, angle is the phase (0° points right at the notch, counter-clockwise is positive). Phases never change these probabilities on their own; they decide how branches add or cancel when paths recombine (lesson 3).</p>
       <div id="ampRows" class="ampRows"></div>
       <p id="entCheck" class="entcheck small mono"></p>
-      <h3>Bloch sphere <span class="muted small">(drag to rotate)</span></h3>
+      <h3>Bloch sphere <span class="muted small">(drag to rotate — each gate sweeps the arrow along its actual rotation axis; skipped if your system asks for reduced motion)</span></h3>
       <canvas id="bloch" aria-label="Bloch sphere showing the qubit state"></canvas>
       <p id="blochReadout" class="mono small"></p>
       <p id="blochNote" class="small muted"></p>

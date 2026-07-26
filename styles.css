@@ -185,6 +185,12 @@ button:focus-visible, input:focus-visible, .chip:has(input:focus-visible) {
 .cstepband { fill: var(--accent-soft); }
 .cstephit { cursor: pointer; }
 .copgroup.future { opacity: 0.35; }
+/* per-step × in the bottom strip: delete just that gate */
+.cdel { cursor: pointer; }
+.cdelring { fill: var(--panel); stroke: var(--border); stroke-width: 1.2; }
+.cdeltext { fill: var(--muted); font: 700 11px system-ui, sans-serif; }
+.cdel:hover .cdelring, .cdel:focus .cdelring { stroke: var(--accent); }
+.cdel:hover .cdeltext, .cdel:focus .cdeltext { fill: var(--accent); }
 .scrub #scrubLabel { flex: 1 1 12rem; }
 #scrubHint { margin: 0.2rem 0 0; }
 
