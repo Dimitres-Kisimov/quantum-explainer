@@ -209,6 +209,27 @@ const CN01 = { gate: 'CNOT', control: 0, target: 1 };
      'describeStep: second H reports interference');
 }
 
+/* ---------- amplitude phases (what the phase dials draw) ---------- */
+{
+  const deg = (a) => Q.carg(a) * 180 / Math.PI;
+  ok(approx(deg(Q.c(1, 0)), 0), 'carg(1) = 0 deg (real positive points right)');
+  ok(approx(deg(Q.c(0, 1)), 90), 'carg(i) = 90 deg');
+  ok(approx(deg(Q.c(-1, 0)), 180), 'carg(-1) = 180 deg');
+  ok(approx(deg(Q.c(0, -1)), -90), 'carg(-i) = -90 deg');
+
+  const plus = Q.runOps([H0], 1);
+  const minus = Q.applyOp(plus, { gate: 'Z', target: 0 });
+  ok(approx(deg(minus[0]), 0) && approx(deg(minus[1]), 180),
+     'Z on |+>: |1> amplitude phase flips to 180 deg, |0> stays at 0');
+  const sp = Q.applyOp(plus, { gate: 'S', target: 0 });
+  ok(approx(deg(sp[1]), 90), 'S on |+>: |1> amplitude phase is 90 deg');
+  const rz = Q.applyOp(plus, { gate: 'RZ', target: 0, angle: P / 2 });
+  ok(approx(deg(rz[0]), -45) && approx(deg(rz[1]), 45),
+     'RZ(90 deg) on |+>: phases split to -45/+45 deg, magnitudes unchanged');
+  ok(approx(Q.cabs(rz[0]), Math.SQRT1_2) && approx(Q.cabs(rz[1]), Math.SQRT1_2),
+     'RZ(90 deg) on |+>: both magnitudes still 1/sqrt(2) (phase-only gate)');
+}
+
 /* ---------- intermediate states (what the step scrubber replays) ---------- */
 {
   const hzh = [H0, { gate: 'Z', target: 0 }, H0];

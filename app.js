@@ -309,6 +309,60 @@ function renderExplain() {
 }
 
 /* ---------- amplitudes + entanglement check ---------- */
+/* Phase dial: one amplitude drawn as an arrow in the complex plane.
+ * Length = magnitude (full radius = 1), angle = atan2(im, re): 0° points
+ * right, counter-clockwise is positive — so the -0.707 on |1⟩ after H,Z
+ * points left (180°). That is the invisible sign lesson 3 is about, made
+ * visible: probabilities ignore the angle, interference does not.
+ * data-deg / data-mag mirror the drawn values for tests and debugging. */
+function phaseDial(a) {
+  const mag = Q.cabs(a);
+  const rad = Q.carg(a);
+  const deg = Math.round(rad * 180 / Math.PI);
+  const zero = mag < 5e-4; // below fmt()'s 3-decimal display threshold
+  const dial = document.createElementNS(SVGNS, 'svg');
+  dial.setAttribute('class', 'phasedial');
+  dial.setAttribute('viewBox', '0 0 24 24');
+  dial.setAttribute('role', 'img');
+  dial.setAttribute('data-deg', String(deg));
+  dial.setAttribute('data-mag', Q.fmt(mag, 2));
+  dial.setAttribute('aria-label', zero ? 'amplitude 0'
+    : 'phase ' + deg + ' degrees, magnitude ' + Q.fmt(mag, 2));
+  const title = document.createElementNS(SVGNS, 'title');
+  title.textContent = zero
+    ? 'Amplitude 0 — this branch is empty'
+    : 'This amplitude in the complex plane: phase ' + deg + '°, magnitude ' + Q.fmt(mag, 2);
+  dial.appendChild(title);
+  const ring = document.createElementNS(SVGNS, 'circle');
+  ring.setAttribute('cx', 12); ring.setAttribute('cy', 12); ring.setAttribute('r', 10);
+  ring.setAttribute('class', 'dialring');
+  dial.appendChild(ring);
+  const tick = document.createElementNS(SVGNS, 'line'); // 0° reference notch
+  tick.setAttribute('x1', 22); tick.setAttribute('y1', 12);
+  tick.setAttribute('x2', 19); tick.setAttribute('y2', 12);
+  tick.setAttribute('class', 'dialtick');
+  dial.appendChild(tick);
+  if (zero) {
+    const dot = document.createElementNS(SVGNS, 'circle');
+    dot.setAttribute('cx', 12); dot.setAttribute('cy', 12); dot.setAttribute('r', 1.6);
+    dot.setAttribute('class', 'dialzero');
+    dial.appendChild(dot);
+  } else {
+    const x2 = 12 + 10 * mag * Math.cos(rad);
+    const y2 = 12 - 10 * mag * Math.sin(rad); // SVG y grows downward
+    const arrow = document.createElementNS(SVGNS, 'line');
+    arrow.setAttribute('x1', 12); arrow.setAttribute('y1', 12);
+    arrow.setAttribute('x2', x2); arrow.setAttribute('y2', y2);
+    arrow.setAttribute('class', 'dialarrow');
+    dial.appendChild(arrow);
+    const tip = document.createElementNS(SVGNS, 'circle');
+    tip.setAttribute('cx', x2); tip.setAttribute('cy', y2); tip.setAttribute('r', 1.8);
+    tip.setAttribute('class', 'dialtip');
+    dial.appendChild(tip);
+  }
+  return dial;
+}
+
 function renderAmps() {
   const box = $('ampRows');
   box.textContent = '';
@@ -321,6 +375,7 @@ function renderAmps() {
     const basis = document.createElement('span');
     basis.className = 'basis mono';
     basis.textContent = '|' + Q.bitstring(i, n) + '⟩';
+    const dial = phaseDial(a);
     const amp = document.createElement('span');
     amp.className = 'amp mono';
     amp.textContent = Q.fmtComplex(a);
@@ -333,7 +388,7 @@ function renderAmps() {
     const pct = document.createElement('span');
     pct.className = 'pct mono';
     pct.textContent = (probs[i] * 100).toFixed(1) + '%';
-    row.appendChild(basis); row.appendChild(amp); row.appendChild(bar); row.appendChild(pct);
+    row.appendChild(basis); row.appendChild(dial); row.appendChild(amp); row.appendChild(bar); row.appendChild(pct);
     box.appendChild(row);
   });
   const ent = $('entCheck');
