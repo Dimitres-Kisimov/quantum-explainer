@@ -40,6 +40,19 @@ cited to a real source (references below and in the app footer).
   In two-qubit mode it draws each qubit's *reduced* state — so you can watch
   both arrows collapse to the centre of the sphere when the qubits entangle,
   which is the most honest picture of entanglement I know how to draw.
+- **Animated gate sweeps**: every gate is a Bloch-sphere rotation, so the
+  arrow now *sweeps* along the gate's actual rotation axis (~260 ms) instead
+  of teleporting — RX/RY/RZ visibly turn about x/y/z, H about the (x+z)
+  diagonal, and Undo/Prev sweep the same rotation backwards. The frames come
+  from `partialOp` in the simulator (the state a fraction *t* of the way
+  through the gate, unit-tested like everything else); a CNOT animates as a
+  controlled partial flip, phase-corrected so the endpoint is exactly CNOT.
+  The animation is display-only — tables, checks, and seeded runs always use
+  the exact final state — and is skipped under `prefers-reduced-motion`.
+- **Delete any single step**: the × under a circuit column (or the "Remove
+  step" button while viewing one) deletes just that gate and recomputes —
+  no more undoing your whole circuit to fix one middle gate. Later steps
+  renumber; a toast says what was removed.
 - **Learn mode**: short lessons on superposition, measurement, interference
   (with the cancellation arithmetic written out), entanglement (a Bell-state
   walkthrough), plus a "What quantum computers are NOT" section covering the
@@ -79,8 +92,8 @@ Everything is checkable from a stock Node installation:
 
 ```
 node --check sim.js app.js sw.js     # syntax
-node test/sim.test.mjs               # 56 physics/behaviour assertions
-node tools/verify.mjs                # manifest, precache, offline guard (63 checks)
+node test/sim.test.mjs               # 81 physics/behaviour assertions
+node tools/verify.mjs                # manifest, precache, offline guard (67 checks)
 ```
 
 The test harness asserts, among other things: H|0⟩ gives 50/50; H·H|0⟩
@@ -88,9 +101,12 @@ returns |0⟩ (interference); CNOT on (H|0⟩)⊗|0⟩ yields the Bell state wit
 joint probabilities {00: 0.5, 11: 0.5} and a failing factorability check;
 RY(π) ≈ X up to global phase; seeded measurement is reproducible; norms
 stay 1 to 1e-10 through long circuits; amplitude phases come out right for
-the dials (Z flips |1⟩'s phase to 180°, RZ(90°) splits ±45°); and the
+the dials (Z flips |1⟩'s phase to 180°, RZ(90°) splits ±45°); the
 op-by-op intermediate states the scrubber replays match the end-to-end
-result. The verifier proves the app references no external asset of any kind.
+result; and the fractional gates behind the Bloch sweep are the identity at
+t = 0, the true gate at t = 1 (exactly, for CNOT — no stray control phase),
+and norm-preserving mid-sweep. The verifier proves the app references no
+external asset of any kind.
 
 `tools/make_icons.py` (Python + Pillow) regenerates the PNG icons from the
 same geometry as the hand-drawn `icons/icon.svg`.
