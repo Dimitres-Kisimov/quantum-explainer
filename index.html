@@ -32,9 +32,9 @@
       <p class="tagline">What quantum computers really do — and what they don't. No hype, runs offline.</p>
     </div>
   </div>
-  <nav class="tabs" aria-label="Main">
-    <button class="tab active" data-view="playground" aria-controls="view-playground">Playground</button>
-    <button class="tab" data-view="learn" aria-controls="view-learn">Learn</button>
+  <nav class="tabs" role="tablist" aria-label="Main">
+    <button class="tab active" role="tab" aria-selected="true" data-view="playground" aria-controls="view-playground">Playground</button>
+    <button class="tab" role="tab" aria-selected="false" data-view="learn" aria-controls="view-learn">Learn</button>
   </nav>
   <div class="header-actions">
     <button id="installBtn" hidden>Install app</button>
@@ -45,7 +45,7 @@
 <main>
 
 <!-- ============================ PLAYGROUND ============================ -->
-<section id="view-playground" class="view">
+<section id="view-playground" class="view" role="tabpanel" aria-label="Playground">
   <div class="grid">
 
     <div class="panel" id="panel-build">
@@ -123,7 +123,7 @@
 </section>
 
 <!-- ============================ LEARN ============================ -->
-<section id="view-learn" class="view" hidden>
+<section id="view-learn" class="view" role="tabpanel" aria-label="Learn" hidden>
   <div class="learnwrap">
 
     <div class="houserules panel">

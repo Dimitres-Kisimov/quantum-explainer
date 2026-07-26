@@ -346,9 +346,11 @@ function drawBloch() {
   ctx.fillText('|0⟩', top.x - 8, top.y);
   ctx.fillText('|1⟩', bot.x - 8, bot.y + 8);
 
-  // state arrows
+  // state arrows — branch on the ACTUAL state length, never on the nQubits
+  // flag, so a mid-update call (e.g. from switchView) can never read past
+  // the end of a 1-qubit state.
   const st = current();
-  if (nQubits === 1) {
+  if (st.length === 2) {
     const b = Q.blochVector(st);
     drawArrow(ctx, pr, b, acc, null);
     $('blochReadout').textContent =
@@ -449,8 +451,12 @@ function loadPreset(name) {
   $('targetWrap').hidden = nQubits === 1;
   $('cnotWrap').hidden = nQubits === 1;
   ops = p.ops.map((o) => Object.assign({}, o));
-  switchView('playground');
+  // recompute BEFORE switchView: switchView draws the Bloch sphere, so the
+  // states[] array must already match the new qubit count (the old order
+  // crashed the bell preset from 1-qubit mode: drawBloch read state[2] of a
+  // 2-element state).
   recompute();
+  switchView('playground');
   if (p.run) runShots();
   window.scrollTo({ top: 0 });
 }
