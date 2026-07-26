@@ -228,6 +228,18 @@ button:focus-visible, input:focus-visible, .chip:has(input:focus-visible) {
   font-size: 0.85rem;
 }
 .hist .placeholder { color: var(--muted); font-size: 0.85rem; }
+.collapseline {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+  margin-top: 0.6rem;
+  padding: 0.5rem 0.7rem;
+  background: var(--warnbg);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+}
+.collapseline span { flex: 1 1 14rem; }
 
 /* ---------- transient feedback toast ---------- */
 #toast {

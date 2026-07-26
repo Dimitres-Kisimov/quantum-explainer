@@ -28,9 +28,13 @@ let ops = [];            // [{gate, target, control?, angle?}]
 let states = [Q.zeroState(1)];  // states[k] = state after k ops
 const view = { yaw: -0.7, pitch: 0.42 }; // bloch camera
 let lastRunOpsKey = null;
+let measured = null;     // {index, state}: set by "Measure once" (collapse), cleared on any edit
 
 const current = () => states[states.length - 1];
-const opsKey = () => JSON.stringify([nQubits, ops]);
+// What the state panels show: the circuit output, unless a single-shot
+// measurement collapsed it — then the post-measurement basis state.
+const displayState = () => (measured ? measured.state : current());
+const opsKey = () => JSON.stringify([nQubits, ops, measured ? measured.index : -1]);
 
 /* ================= tabs ================= */
 function switchView(name) {
@@ -114,12 +118,14 @@ function toast(msg) {
 
 /* ================= recompute + render ================= */
 function recompute() {
+  measured = null; // any edit discards a single-shot collapse
   states = [Q.zeroState(nQubits)];
   for (const op of ops) states.push(Q.applyOp(current(), op));
   renderCircuit();
   renderExplain();
   renderAmps();
   drawBloch();
+  renderCollapse();
   renderHistPlaceholder();
 }
 
@@ -233,7 +239,7 @@ function renderExplain() {
 function renderAmps() {
   const box = $('ampRows');
   box.textContent = '';
-  const st = current();
+  const st = displayState();
   const n = Q.nQubitsOf(st);
   const probs = Q.probabilities(st);
   st.forEach((a, i) => {
@@ -371,7 +377,7 @@ function drawBloch() {
   // state arrows — branch on the ACTUAL state length, never on the nQubits
   // flag, so a mid-update call (e.g. from switchView) can never read past
   // the end of a 1-qubit state.
-  const st = current();
+  const st = displayState();
   if (st.length === 2) {
     const b = Q.blochVector(st);
     drawArrow(ctx, pr, b, acc, null);
@@ -419,18 +425,22 @@ function renderHistPlaceholder() {
   p.className = 'placeholder';
   p.textContent = lastRunOpsKey === null
     ? 'Run to sample the current state 1000 times.'
-    : 'Circuit changed — run again to sample the new state.';
+    : 'Circuit or state changed — run again to sample the new state.';
   box.appendChild(p);
 }
-function runShots() {
+function readSeed() {
   const seedRaw = parseInt($('seed').value, 10);
   const seed = Number.isFinite(seedRaw) && seedRaw >= 0 ? seedRaw : 42;
   $('seed').value = seed;
-  const res = Q.measureShots(current(), 1000, seed);
+  return seed;
+}
+function runShots() {
+  const seed = readSeed();
+  const res = Q.measureShots(displayState(), 1000, seed);
   lastRunOpsKey = opsKey();
   const box = $('hist');
   box.textContent = '';
-  const n = Q.nQubitsOf(current());
+  const n = Q.nQubitsOf(displayState());
   Object.keys(res.counts).sort().forEach((key) => {
     const count = res.counts[key];
     const row = document.createElement('div');
@@ -456,6 +466,50 @@ function runShots() {
   box.appendChild(note);
 }
 $('runBtn').addEventListener('click', runShots);
+
+/* ---------- measure ONCE: a single shot that collapses the state ----------
+ * Lesson 2 says "the state then updates to match the answer; the superposition
+ * is gone" — this demonstrates it. One sample via the Born rule, then the
+ * shown state snaps to the outcome basis state. Repeated clicks re-measure the
+ * collapsed state and (honestly) keep giving the same answer. Any circuit edit
+ * or "Back to circuit state" restores the circuit output.
+ * Draws come from a seeded PRNG (same seed field): reloading and repeating the
+ * same clicks reproduces the same outcomes, consistent with the app's
+ * reproducibility rule. */
+let onceRng = null, onceSeed = null;
+function measureOnce() {
+  const seed = readSeed();
+  if (!onceRng || seed !== onceSeed) { onceRng = Q.mulberry32(seed); onceSeed = seed; }
+  const pre = displayState();
+  const probs = Q.probabilities(pre);
+  const idx = Q.sampleIndex(probs, onceRng());
+  const post = pre.map((_, i) => Q.c(i === idx ? 1 : 0));
+  const wasCollapsed = measured !== null;
+  measured = { index: idx, state: post };
+  renderAmps();
+  drawBloch();
+  renderCollapse(wasCollapsed);
+  renderHistPlaceholder();
+}
+function renderCollapse(reMeasured) {
+  const box = $('collapseBox');
+  if (!measured) { box.hidden = true; $('collapseMsg').textContent = ''; return; }
+  const n = Q.nQubitsOf(measured.state);
+  const ket = '|' + Q.bitstring(measured.index, n) + '⟩';
+  $('collapseMsg').textContent = reMeasured
+    ? 'Measured again: ' + ket + ' — same answer, with certainty. A collapsed state has nothing left to be random about.'
+    : 'One shot: got ' + ket + '. The state collapsed — all amplitude is now on ' + ket + ' and the superposition is gone. Measure again: the answer repeats.';
+  box.hidden = false;
+}
+$('onceBtn').addEventListener('click', measureOnce);
+$('uncollapseBtn').addEventListener('click', () => {
+  if (!measured) return;
+  measured = null;
+  renderAmps();
+  drawBloch();
+  renderCollapse();
+  renderHistPlaceholder();
+});
 
 /* ================= presets (lesson "try it" buttons) ================= */
 const PRESETS = {

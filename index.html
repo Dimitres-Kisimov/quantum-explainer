@@ -90,6 +90,15 @@
         <button id="undoBtn" class="ghost">Undo</button>
         <button id="clearBtn" class="ghost">Clear</button>
       </div>
+
+      <p class="lbl">Guided experiments <span class="muted small">(the same demos as the lessons)</span></p>
+      <div class="try">
+        <button class="trybtn" data-preset="plus">H — superposition</button>
+        <button class="trybtn" data-preset="measure">H + 1000 shots</button>
+        <button class="trybtn" data-preset="hh">H, H — interference</button>
+        <button class="trybtn" data-preset="hzh">H, Z, H — hidden phase</button>
+        <button class="trybtn" data-preset="bell">Bell pair + 1000 shots</button>
+      </div>
     </div>
 
     <div class="panel" id="panel-circuit">
@@ -117,9 +126,14 @@
         <label class="lbl" for="seed">Seed</label>
         <input type="number" id="seed" value="42" min="0" max="999999999" inputmode="numeric">
         <button id="runBtn">Run 1000 shots</button>
+        <button id="onceBtn" class="ghost" title="Take a single sample — the state collapses to the outcome">Measure once</button>
+      </div>
+      <div id="collapseBox" class="collapseline" hidden>
+        <span id="collapseMsg" class="small"></span>
+        <button id="uncollapseBtn" class="ghost small">Back to circuit state</button>
       </div>
       <div id="hist" class="hist" aria-live="polite"></div>
-      <p id="histNote" class="small muted">Sampling uses a seeded pseudo-random generator, so the same seed always reproduces the same counts — handy for teaching. Real quantum hardware gives fresh randomness on every run and adds noise this simulator does not model.</p>
+      <p id="histNote" class="small muted">Sampling uses a seeded pseudo-random generator, so the same seed always reproduces the same counts — handy for teaching. Real quantum hardware gives fresh randomness on every run and adds noise this simulator does not model. <strong>Run 1000 shots</strong> samples statistics without changing the state; <strong>Measure once</strong> takes a single sample and collapses the state to the outcome, exactly as lesson 2 describes.</p>
     </div>
 
   </div>
