@@ -104,6 +104,13 @@
     <div class="panel" id="panel-circuit">
       <h2>Circuit</h2>
       <div id="circuitBox" class="circuitbox" aria-label="Circuit diagram"></div>
+      <div class="row scrub" id="scrubRow" hidden>
+        <button id="stepPrev" class="ghost" title="View the state one gate earlier">&#9664; Prev</button>
+        <span id="scrubLabel" class="small mono" aria-live="polite"></span>
+        <button id="stepNext" class="ghost" title="View the state one gate later">Next &#9654;</button>
+        <button id="stepLatest" class="ghost" title="Follow the newest gate again">Latest</button>
+      </div>
+      <p class="small muted" id="scrubHint" hidden>Click a step number in the diagram (or Prev/Next) to replay the state after any gate — the amplitude table, bars, and Bloch arrow all follow. Measuring while scrubbed samples the state you are looking at.</p>
       <h3>Why did this happen?</h3>
       <p class="small muted">One entry per gate, with the actual numbers from the state vector.</p>
       <ol id="explainList" class="explain"></ol>

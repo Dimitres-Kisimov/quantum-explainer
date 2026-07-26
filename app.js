@@ -29,12 +29,15 @@ let states = [Q.zeroState(1)];  // states[k] = state after k ops
 const view = { yaw: -0.7, pitch: 0.42 }; // bloch camera
 let lastRunOpsKey = null;
 let measured = null;     // {index, state}: set by "Measure once" (collapse), cleared on any edit
+let viewStep = null;     // step scrubber: null = follow the latest gate; 0..ops.length = view states[k]
 
 const current = () => states[states.length - 1];
-// What the state panels show: the circuit output, unless a single-shot
-// measurement collapsed it — then the post-measurement basis state.
-const displayState = () => (measured ? measured.state : current());
-const opsKey = () => JSON.stringify([nQubits, ops, measured ? measured.index : -1]);
+const shownStep = () => (viewStep === null ? ops.length : viewStep);
+// What the state panels show: the circuit state at the scrubbed step (the
+// latest by default), unless a single-shot measurement collapsed it — then
+// the post-measurement basis state.
+const displayState = () => (measured ? measured.state : states[shownStep()]);
+const opsKey = () => JSON.stringify([nQubits, ops, measured ? measured.index : -1, shownStep()]);
 
 /* ================= tabs ================= */
 function switchView(name) {
@@ -119,15 +122,53 @@ function toast(msg) {
 /* ================= recompute + render ================= */
 function recompute() {
   measured = null; // any edit discards a single-shot collapse
+  viewStep = null; // ...and snaps the step scrubber back to the newest gate
   states = [Q.zeroState(nQubits)];
   for (const op of ops) states.push(Q.applyOp(current(), op));
   renderCircuit();
   renderExplain();
   renderAmps();
   drawBloch();
+  renderScrub();
   renderCollapse();
   renderHistPlaceholder();
 }
+
+/* ---------- step scrubber: replay the state after any gate ----------
+ * recompute() already stores every intermediate state in states[]; viewStep
+ * picks which one the State panel, Bloch sphere, and Measure panel look at
+ * (null = follow the newest gate). Editing the circuit snaps back to latest.
+ * Scrubbing discards a single-shot collapse — the collapsed state belonged
+ * to the step that was showing when it was measured. */
+function scrubTo(k) {
+  viewStep = (k === null || k >= ops.length) ? null : Math.max(0, k);
+  measured = null;
+  renderCircuit();
+  renderExplain();
+  renderAmps();
+  drawBloch();
+  renderScrub();
+  renderCollapse();
+  renderHistPlaceholder();
+}
+function renderScrub() {
+  const empty = ops.length === 0;
+  $('scrubRow').hidden = empty;
+  $('scrubHint').hidden = empty;
+  if (empty) return;
+  const k = shownStep();
+  $('stepPrev').disabled = k === 0;
+  $('stepNext').disabled = viewStep === null;
+  $('stepLatest').disabled = viewStep === null;
+  $('scrubLabel').textContent = viewStep === null
+    ? 'Showing: after step ' + ops.length + ' of ' + ops.length + ' (latest)'
+    : (k === 0
+        ? 'Showing: the start — ' + (nQubits === 1 ? '|0⟩' : '|00⟩') + ', nothing applied yet'
+        : 'Showing: after step ' + k + ' of ' + ops.length + ' — ' + opLabel(ops[k - 1]));
+}
+$('stepPrev').addEventListener('click', () => scrubTo(shownStep() - 1));
+$('stepNext').addEventListener('click', () => scrubTo(shownStep() + 1));
+$('stepLatest').addEventListener('click', () => scrubTo(null));
 
 function opLabel(op) {
   if (op.gate === 'CNOT') return 'CNOT (control q' + op.control + ', target q' + op.target + ')';
@@ -148,13 +189,14 @@ function renderCircuit() {
   svg.setAttribute('role', 'img');
   svg.setAttribute('aria-label', ops.length ? 'Circuit: ' + ops.map(opLabel).join(', ') : 'Empty circuit');
   const wireY = (q) => 40 + q * 54;
+  let parent = svg; // helpers append here; per-op <g> groups swap it in
   const text = (x, y, str, cls, anchor) => {
     const t = document.createElementNS(SVGNS, 'text');
     t.setAttribute('x', x); t.setAttribute('y', y);
     t.setAttribute('class', cls);
     t.setAttribute('text-anchor', anchor || 'middle');
     t.textContent = str;
-    svg.appendChild(t);
+    parent.appendChild(t);
     return t;
   };
   const line = (x1, y1, x2, y2, cls) => {
@@ -162,14 +204,28 @@ function renderCircuit() {
     l.setAttribute('x1', x1); l.setAttribute('y1', y1);
     l.setAttribute('x2', x2); l.setAttribute('y2', y2);
     l.setAttribute('class', cls);
-    svg.appendChild(l);
+    parent.appendChild(l);
   };
+  // scrubbed: a translucent band behind the column being viewed
+  if (viewStep !== null && viewStep > 0) {
+    const band = document.createElementNS(SVGNS, 'rect');
+    band.setAttribute('x', x0 + (viewStep - 1) * colW - 20); band.setAttribute('y', 2);
+    band.setAttribute('width', 40); band.setAttribute('height', h - 4);
+    band.setAttribute('rx', 8);
+    band.setAttribute('class', 'cstepband');
+    svg.appendChild(band);
+  }
   for (let q = 0; q < nQubits; q++) {
     text(8, wireY(q) + 4, 'q' + q + ' |0⟩', 'cketlbl', 'start');
     line(70, wireY(q), w - 8, wireY(q), 'cwire');
   }
   ops.forEach((op, k) => {
     const cx = x0 + k * colW;
+    const g = document.createElementNS(SVGNS, 'g');
+    // gates after the scrubbed step haven't "happened yet" in the viewed state
+    g.setAttribute('class', 'copgroup' + (viewStep !== null && k >= viewStep ? ' future' : ''));
+    svg.appendChild(g);
+    parent = g;
     text(cx, 14, String(k + 1), 'cstep');
     if (op.gate === 'CNOT') {
       const yc = wireY(op.control), yt = wireY(op.target);
@@ -177,11 +233,11 @@ function renderCircuit() {
       const dot = document.createElementNS(SVGNS, 'circle');
       dot.setAttribute('cx', cx); dot.setAttribute('cy', yc); dot.setAttribute('r', 5);
       dot.setAttribute('class', 'cnotdot');
-      svg.appendChild(dot);
+      g.appendChild(dot);
       const ring = document.createElementNS(SVGNS, 'circle');
       ring.setAttribute('cx', cx); ring.setAttribute('cy', yt); ring.setAttribute('r', 10);
       ring.setAttribute('class', 'cnotring');
-      svg.appendChild(ring);
+      g.appendChild(ring);
       line(cx, yt - 10, cx, yt + 10, 'cnotline');
       line(cx - 10, yt, cx + 10, yt, 'cnotline');
     } else {
@@ -191,11 +247,24 @@ function renderCircuit() {
       r.setAttribute('width', 34); r.setAttribute('height', 34);
       r.setAttribute('rx', 7);
       r.setAttribute('class', 'cbox');
-      svg.appendChild(r);
+      g.appendChild(r);
       const t = text(cx, y + 5, op.gate, 'cboxtext');
       if (op.gate.length > 1) t.setAttribute('style', 'font-size:11px');
       if (op.angle !== undefined) text(cx, y + 31, Q.degOf(op.angle) + '°', 'cangle');
     }
+    // whole column is a click target: view the state right after this gate
+    const hit = document.createElementNS(SVGNS, 'rect');
+    hit.setAttribute('x', cx - colW / 2); hit.setAttribute('y', 0);
+    hit.setAttribute('width', colW); hit.setAttribute('height', h);
+    hit.setAttribute('fill', 'transparent');
+    hit.setAttribute('class', 'cstephit');
+    hit.setAttribute('data-step', k + 1);
+    const tt = document.createElementNS(SVGNS, 'title');
+    tt.textContent = 'View the state after step ' + (k + 1) + ' (' + opLabel(op) + ')';
+    hit.appendChild(tt);
+    hit.addEventListener('click', () => scrubTo(k + 1));
+    g.appendChild(hit);
+    parent = svg;
   });
   box.appendChild(svg);
 }
@@ -222,6 +291,10 @@ function renderExplain() {
   }
   ops.forEach((op, k) => {
     const li = document.createElement('li');
+    if (viewStep !== null) {
+      if (k + 1 === viewStep) li.className = 'viewing';
+      else if (k + 1 > viewStep) li.className = 'future';
+    }
     const head = document.createElement('span');
     head.className = 'stepgate';
     head.textContent = opLabel(op) + ' — ';

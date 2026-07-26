@@ -180,8 +180,25 @@ button:focus-visible, input:focus-visible, .chip:has(input:focus-visible) {
 .cnotdot { fill: var(--accent); }
 .cnotring { fill: none; stroke: var(--accent); stroke-width: 1.6; }
 
+/* step scrubber: band marks the viewed column; gates past it have not
+   "happened yet" in the viewed state, so they dim */
+.cstepband { fill: var(--accent-soft); }
+.cstephit { cursor: pointer; }
+.copgroup.future { opacity: 0.35; }
+.scrub #scrubLabel { flex: 1 1 12rem; }
+#scrubHint { margin: 0.2rem 0 0; }
+
 .explain { margin: 0.3rem 0 0; padding-left: 1.2rem; display: grid; gap: 0.5rem; }
 .explain li { font-size: 0.88rem; }
+/* scrubbed: highlight the viewed step's entry, dim the not-yet-applied ones */
+.explain li.viewing {
+  background: var(--accent-soft);
+  border-left: 3px solid var(--accent);
+  border-radius: 0 6px 6px 0;
+  padding: 0.2rem 0.4rem 0.2rem 0.5rem;
+  margin-left: -0.5rem;
+}
+.explain li.future { opacity: 0.45; }
 .explain .probline { color: var(--muted); font-size: 0.8rem; display: block; margin-top: 0.15rem; }
 .explain .stepgate { font-weight: 700; }
 
@@ -198,8 +215,6 @@ button:focus-visible, input:focus-visible, .chip:has(input:focus-visible) {
 }
 .amprow .basis { color: var(--fg); }
 .amprow .amp { color: var(--muted); white-space: nowrap; }
-.bar { height: 10px; background: var(--track); border-radius: 0 4px 4px 0; overflow: hidden; }
-.bar .fill { height: 100%; width: 0; background: var(--accent); border-radius: 0 4px 4px 0; }
 .amprow .pct, .histrow .cnt { text-align: right; color: var(--fg); }
 .entcheck { margin: 0.6rem 0 0; }
 

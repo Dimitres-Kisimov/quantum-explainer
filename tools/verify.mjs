@@ -99,6 +99,9 @@ ok(/rel="manifest"/.test(html), 'index.html links the manifest');
 ok(/apple-touch-icon/.test(html), 'index.html links an apple-touch-icon');
 ok(/Add to Home Screen/.test(html), 'index.html contains the iOS install hint');
 ok(/What quantum computers are NOT/i.test(html), 'index.html contains the "What quantum computers are NOT" section');
+for (const id of ['scrubRow', 'stepPrev', 'stepNext', 'stepLatest', 'scrubLabel']) {
+  ok(new RegExp('id="' + id + '"').test(html), 'step-scrubber control present: #' + id);
+}
 for (const ref of ['1801.00862', '1905.09749', 'Nielsen', 'Preskill', 'learning\\.quantum\\.ibm\\.com']) {
   ok(new RegExp(ref).test(html), 'reference present in page: ' + ref.replace('\\\\', '\\'));
 }

@@ -209,6 +209,22 @@ const CN01 = { gate: 'CNOT', control: 0, target: 1 };
      'describeStep: second H reports interference');
 }
 
+/* ---------- intermediate states (what the step scrubber replays) ---------- */
+{
+  const hzh = [H0, { gate: 'Z', target: 0 }, H0];
+  const states = [Q.zeroState(1)];
+  for (const op of hzh) states.push(Q.applyOp(states[states.length - 1], op));
+  ok(states.length === 4, 'scrubber invariant: N ops store N+1 states (start included)');
+  ok(approx(Q.probabilities(states[1])[0], 0.5), 'H,Z,H after step 1: 50/50');
+  ok(approx(states[2][1].re, -Math.SQRT1_2) && approx(states[2][1].im, 0),
+     'H,Z,H after step 2 is |->: amp(|1>) = -0.707 (the hidden sign)');
+  ok(approx(Q.probabilities(states[2])[1], 0.5),
+     'after step 2 probabilities are still 50/50 (the phase is invisible to measurement)');
+  ok(approx(Q.probabilities(states[3])[1], 1), 'after step 3 interference resolves to |1>');
+  ok(approx(Q.fidelity(states[3], Q.runOps(hzh, 1)), 1),
+     'stepping through op-by-op matches runOps end-to-end (fidelity 1)');
+}
+
 /* ---------- summary ---------- */
 console.log('');
 console.log(pass + ' passed, ' + fail + ' failed');
