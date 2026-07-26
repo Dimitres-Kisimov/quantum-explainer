@@ -24,6 +24,18 @@ cited to a real source (references below and in the app footer).
   plain-language "why did this happen" entry for every step — with the actual
   numbers from the state vector, including the explicit non-factorability
   check when a CNOT entangles the qubits.
+- **A step scrubber**: click any step number in the circuit diagram (or use
+  Prev/Next) to replay the state after any intermediate gate — the amplitude
+  table, phase dials, and Bloch arrow all follow, the viewed column is
+  highlighted, and not-yet-applied gates dim. The simulator always stored
+  every intermediate state; the scrubber just lets you look at them, so you
+  can watch H,H take the arrow pole → equator → pole. Measuring while
+  scrubbed honestly samples the state you are looking at.
+- **Phase dials**: next to each complex amplitude, a small dial draws it as
+  an arrow in the complex plane (length = magnitude, angle = phase). Phases
+  don't change measurement odds on their own — the dials make that visible:
+  after H,Z the |1⟩ arrow points backwards at 180° while the bars still say
+  50/50, which is exactly why the second H then flips the outcome.
 - **An interactive Bloch sphere** (canvas, drag to rotate) with θ/φ readout.
   In two-qubit mode it draws each qubit's *reduced* state — so you can watch
   both arrows collapse to the centre of the sphere when the qubits entangle,
@@ -67,16 +79,18 @@ Everything is checkable from a stock Node installation:
 
 ```
 node --check sim.js app.js sw.js     # syntax
-node test/sim.test.mjs               # 42 physics/behaviour assertions
-node tools/verify.mjs                # manifest, precache, offline guard (57 checks)
+node test/sim.test.mjs               # 56 physics/behaviour assertions
+node tools/verify.mjs                # manifest, precache, offline guard (63 checks)
 ```
 
 The test harness asserts, among other things: H|0⟩ gives 50/50; H·H|0⟩
 returns |0⟩ (interference); CNOT on (H|0⟩)⊗|0⟩ yields the Bell state with
 joint probabilities {00: 0.5, 11: 0.5} and a failing factorability check;
-RY(π) ≈ X up to global phase; seeded measurement is reproducible; and norms
-stay 1 to 1e-10 through long circuits. The verifier proves the app references
-no external asset of any kind.
+RY(π) ≈ X up to global phase; seeded measurement is reproducible; norms
+stay 1 to 1e-10 through long circuits; amplitude phases come out right for
+the dials (Z flips |1⟩'s phase to 180°, RZ(90°) splits ±45°); and the
+op-by-op intermediate states the scrubber replays match the end-to-end
+result. The verifier proves the app references no external asset of any kind.
 
 `tools/make_icons.py` (Python + Pillow) regenerates the PNG icons from the
 same geometry as the hand-drawn `icons/icon.svg`.
