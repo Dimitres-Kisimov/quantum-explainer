@@ -325,3 +325,22 @@ button:focus-visible, input:focus-visible, .chip:has(input:focus-visible) {
   .brand h1 { font-size: 1.02rem; }
   .header-actions { margin-left: 0; }
 }
+
+/* ---------- self-test panel (?selftest=1) ---------- */
+:root { --ok: #157347; --bad: #b02a37; }
+@media (prefers-color-scheme: dark) {
+  :root { --ok: #4ade80; --bad: #f87171; }
+}
+.selftest { margin: 1rem; border-left: 6px solid var(--ok); }
+.selftest.selftest-fail { border-left-color: var(--bad); }
+.selftest h2 { margin-top: 0; color: var(--ok); }
+.selftest.selftest-fail h2 { color: var(--bad); }
+.selftest-list { list-style: none; margin: 0.6rem 0 0; padding: 0; }
+.selftest-list li {
+  padding: 0.15rem 0.2rem;
+  border-bottom: 1px solid var(--border);
+  white-space: pre-wrap;
+  word-break: break-word;
+}
+.selftest-list li.st-ok { color: var(--ok); }
+.selftest-list li.st-fail { color: var(--bad); font-weight: 600; }

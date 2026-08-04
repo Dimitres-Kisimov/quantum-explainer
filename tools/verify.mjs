@@ -69,7 +69,7 @@ if (precacheBlock) {
 ok(/VERSION\s*=/.test(sw), 'sw.js has a VERSION for cache busting');
 
 /* ---------- 3. offline / no-external-asset guard ---------- */
-const APP_FILES = ['index.html', 'styles.css', 'app.js', 'sim.js', 'sw.js',
+const APP_FILES = ['index.html', 'styles.css', 'app.js', 'sim.js', 'selftest.js', 'sw.js',
                    'manifest.webmanifest', 'icons/icon.svg'];
 const GUARDS = [
   [/(src|href)\s*=\s*["']https?:/i, 'src=/href= to an external http(s) URL'],
@@ -107,6 +107,18 @@ const appjs = read('app.js');
 ok(/Q\.partialOp\(/.test(appjs), 'Bloch sweep animates via Q.partialOp (fractional gates)');
 ok(/prefers-reduced-motion/.test(appjs), 'Bloch sweep respects prefers-reduced-motion');
 ok(/removeOpAt\(/.test(appjs), 'single-step delete (removeOpAt) is wired up');
+
+/* ---------- self-test harness (?selftest=1) ---------- */
+const selftest = read('selftest.js');
+ok(/src="selftest\.js"/.test(html), 'index.html loads selftest.js');
+ok(/selftest=1|get\('selftest'\)/.test(appjs) && /QSelfTest/.test(appjs),
+   'app.js wires the ?selftest=1 in-browser harness via QSelfTest');
+ok(/globalThis\.QSelfTest/.test(selftest) && /function run\(/.test(selftest),
+   'selftest.js exposes QSelfTest.run for the browser and Node');
+ok(/require\('\.\/sim\.js'\)/.test(selftest) && /process\.exit/.test(selftest),
+   'selftest.js is runnable as a Node gate (node selftest.js, exits non-zero on failure)');
+ok(/isUnitary/.test(selftest) && /concurrence|productDet/.test(selftest),
+   'selftest.js checks gate unitarity and Bell non-factorability against the real routines');
 for (const ref of ['1801.00862', '1905.09749', 'Nielsen', 'Preskill', 'learning\\.quantum\\.ibm\\.com']) {
   ok(new RegExp(ref).test(html), 'reference present in page: ' + ref.replace('\\\\', '\\'));
 }

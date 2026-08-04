@@ -795,8 +795,67 @@ if ('serviceWorker' in navigator &&
   });
 }
 
+/* ================= self-test harness (?selftest=1) =================
+ * A machine-checked proof, in this browser, that the quantum math the app
+ * teaches is correct. It runs the portable suite in selftest.js against the
+ * SAME QSim the app uses, reports PASS n/n on the page, and exposes the result
+ * on window.__selftest / the <html data-selftest> attribute for headless checks.
+ * Mirrors the flagship app's ?selftest=1 convention. Deterministic (seeded). */
+function renderSelfTest() {
+  const params = new URLSearchParams(location.search);
+  const flag = params.get('selftest');
+  if (flag !== '1' && flag !== 'true' && flag !== 'on') return;
+
+  const res = (window.QSelfTest && window.QSelfTest.run)
+    ? window.QSelfTest.run(Q)
+    : { pass: 0, fail: 1, total: 1, allPass: false,
+        results: [{ ok: false, msg: 'selftest.js (QSelfTest) failed to load' }] };
+
+  const panel = document.createElement('section');
+  panel.className = 'panel selftest ' + (res.allPass ? 'selftest-pass' : 'selftest-fail');
+  panel.setAttribute('role', 'status');
+
+  const h = document.createElement('h2');
+  h.textContent = (res.allPass ? '✓ Self-test PASS ' : '✗ Self-test FAILED ') +
+    res.pass + '/' + res.total;
+  panel.appendChild(h);
+
+  const lede = document.createElement('p');
+  lede.className = 'small muted';
+  lede.textContent = 'Every check below runs the real simulator (sim.js) live in this ' +
+    'browser and asserts a known quantum fact. Deterministic: the only sampling uses a ' +
+    'fixed seed. The exhaustive proof is the 81-assertion Node harness (test/sim.test.mjs); ' +
+    'this is its portable core, so the math can be verified on any device with no tooling.';
+  panel.appendChild(lede);
+
+  const list = document.createElement('ol');
+  list.className = 'selftest-list mono small';
+  for (const r of res.results) {
+    const li = document.createElement('li');
+    li.className = r.ok ? 'st-ok' : 'st-fail';
+    li.textContent = (r.ok ? 'ok   ' : 'FAIL ') + r.msg;
+    list.appendChild(li);
+  }
+  panel.appendChild(list);
+
+  const mainEl = document.querySelector('main');
+  mainEl.insertBefore(panel, mainEl.firstChild);
+
+  // Machine-readable hooks for headless verification / scripting.
+  window.__selftest = res;
+  const root = document.documentElement;
+  root.setAttribute('data-selftest', res.allPass ? 'pass' : 'fail');
+  root.setAttribute('data-selftest-score', res.pass + '/' + res.total);
+
+  const summary = (res.allPass ? 'PASS ' : 'FAILED ') + res.pass + '/' + res.total;
+  document.title = 'Self-test ' + summary + ' — Quantum Explainer';
+  for (const r of res.results) console.log((r.ok ? 'ok  - ' : 'FAIL - ') + r.msg);
+  console.log('Quantum Explainer self-test: ' + summary);
+}
+
 /* ================= init ================= */
 updateAngleLabel();
 recompute();
 if (location.hash === '#learn') switchView('learn');
+renderSelfTest();
 })();

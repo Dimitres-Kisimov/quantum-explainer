@@ -6,13 +6,14 @@
  */
 'use strict';
 
-const VERSION = 'quantum-explainer-v5';
+const VERSION = 'quantum-explainer-v6';
 const PRECACHE = [
   './',
   './index.html',
   './styles.css',
   './app.js',
   './sim.js',
+  './selftest.js',
   './manifest.webmanifest',
   './icons/icon.svg',
   './icons/icon-192.png',

@@ -91,10 +91,25 @@ Once installed (or simply after the first load), the app runs fully offline.
 Everything is checkable from a stock Node installation:
 
 ```
-node --check sim.js app.js sw.js     # syntax
+node --check sim.js app.js selftest.js sw.js   # syntax
 node test/sim.test.mjs               # 81 physics/behaviour assertions
-node tools/verify.mjs                # manifest, precache, offline guard (67 checks)
+node selftest.js                     # portable correctness self-test (34 checks)
+node tools/verify.mjs                # manifest, precache, offline guard (75 checks)
 ```
+
+**In-browser self-test.** A teaching tool should be able to prove — on the
+device a learner is actually holding, with no tooling installed — that the math
+it teaches is right. Open the app with `?selftest=1` (e.g.
+`http://localhost:8000/?selftest=1`) and a panel reports **PASS n/n**, running
+the same correctness suite (`selftest.js`) live against the real simulator: state
+vectors stay normalized (probabilities sum to 1), the standard gates are unitary
+(U†U = I), H|0⟩ → 50/50, X|0⟩ → |1⟩, H·H|0⟩ → |0⟩ (interference), the Bell
+circuit gives {00: 0.5, 11: 0.5} with 01/10 impossible and a non-factorable
+state, and seeded measurement frequencies match the Born rule |amplitude|². The
+result is also on `window.__selftest` and the `<html data-selftest>` attribute
+for scripting. It is deterministic (the only sampling uses a fixed seed) and is
+a portable subset of the exhaustive Node harness, not a replacement for it — the
+same suite runs headlessly as `node selftest.js` in CI.
 
 The test harness asserts, among other things: H|0⟩ gives 50/50; H·H|0⟩
 returns |0⟩ (interference); CNOT on (H|0⟩)⊗|0⟩ yields the Bell state with
@@ -117,6 +132,7 @@ same geometry as the hand-drawn `icons/icon.svg`.
 index.html            app shell + all lesson content
 styles.css            hand-written styles, light/dark via prefers-color-scheme
 sim.js                the quantum simulator (pure functions, Node-testable)
+selftest.js           portable correctness self-test — powers ?selftest=1 and `node selftest.js`
 app.js                DOM glue: playground, Bloch canvas, histogram, PWA wiring
 manifest.webmanifest  PWA manifest
 sw.js                 service worker (precache-the-shell, cache-first)

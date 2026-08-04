@@ -20,6 +20,7 @@ jobs:
         run: |
           node --check sim.js
           node --check app.js
+          node --check selftest.js
           node --check sw.js
           node --check test/sim.test.mjs
           node --check tools/verify.mjs
@@ -27,7 +28,10 @@ jobs:
       - name: Run simulator test harness (81 assertions)
         run: node test/sim.test.mjs
 
-      - name: Run structural + offline verifier (67 checks)
+      - name: Run the portable correctness self-test (also the in-browser ?selftest=1 suite)
+        run: node selftest.js
+
+      - name: Run structural + offline verifier (75 checks)
         run: node tools/verify.mjs
 
       - name: Offline guard — no external asset references in app files
@@ -36,7 +40,7 @@ jobs:
           # or network APIs in any file the browser loads. grep exits 0 on a
           # match, so a hit fails this step via the leading '!'.
           ! grep -nE "(src|href)[[:space:]]*=[[:space:]]*[\"']https?:|@import|@font-face|url\([[:space:]]*[\"']?https?:|googleapis|gstatic|cdn\.|unpkg|jsdelivr|cloudflare|typekit|fontawesome|bootstrapcdn|XMLHttpRequest|WebSocket|sendBeacon|EventSource|<iframe" \
-            index.html styles.css app.js sim.js sw.js manifest.webmanifest icons/icon.svg
+            index.html styles.css app.js sim.js selftest.js sw.js manifest.webmanifest icons/icon.svg
 
   python-tools:
     name: Ruff on helper scripts
