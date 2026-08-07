@@ -55,11 +55,14 @@ cited to a real source (references below and in the app footer).
   renumber; a toast says what was removed.
 - **Learn mode**: short lessons on superposition, measurement, interference
   (with the cancellation arithmetic written out), entanglement (a Bell-state
-  walkthrough), plus a "What quantum computers are NOT" section covering the
-  parallel-worlds myth, NISQ-era limits, decoherence, error-correction
-  overhead, and why your encryption is not being broken today — and a "where
-  they may genuinely help" section with the asymptotics stated correctly.
-  Every lesson ends with a "try it" button that loads the circuit.
+  walkthrough), and **Deutsch's algorithm** — the smallest circuit with a
+  genuine (if modest) quantum advantage, used to show *phase kickback* and the
+  honest fact that a CNOT does not always entangle. Plus a "What quantum
+  computers are NOT" section covering the parallel-worlds myth, NISQ-era
+  limits, decoherence, error-correction overhead, and why your encryption is
+  not being broken today — and a "where they may genuinely help" section with
+  the asymptotics stated correctly. Every lesson ends with a "try it" button
+  that loads the circuit.
 - **A real PWA**: web app manifest, service worker that precaches the whole
   shell, install button, original icons. After the first visit it works with
   no network at all. Light/dark follows your system preference.
@@ -92,9 +95,9 @@ Everything is checkable from a stock Node installation:
 
 ```
 node --check sim.js app.js selftest.js sw.js   # syntax
-node test/sim.test.mjs               # 81 physics/behaviour assertions
-node selftest.js                     # portable correctness self-test (34 checks)
-node tools/verify.mjs                # manifest, precache, offline guard (75 checks)
+node test/sim.test.mjs               # 107 physics/behaviour assertions
+node selftest.js                     # portable correctness self-test (39 checks)
+node tools/verify.mjs                # manifest, precache, offline guard (79 checks)
 ```
 
 **In-browser self-test.** A teaching tool should be able to prove — on the
@@ -120,8 +123,11 @@ the dials (Z flips |1⟩'s phase to 180°, RZ(90°) splits ±45°); the
 op-by-op intermediate states the scrubber replays match the end-to-end
 result; and the fractional gates behind the Bloch sweep are the identity at
 t = 0, the true gate at t = 1 (exactly, for CNOT — no stray control phase),
-and norm-preserving mid-sweep. The verifier proves the app references no
-external asset of any kind.
+and norm-preserving mid-sweep. For Deutsch's algorithm it checks all four
+oracles: a single query yields the correct constant/balanced verdict with
+certainty, and the oracle leaves the state a product state (concurrence 0) —
+phase kickback, not entanglement — even when the oracle is a CNOT. The
+verifier proves the app references no external asset of any kind.
 
 `tools/make_icons.py` (Python + Pillow) regenerates the PNG icons from the
 same geometry as the hand-drawn `icons/icon.svg`.
@@ -163,6 +169,8 @@ q0 = 1, q1 = 0, and basis index = q0·2 + q1.
    (1997). arXiv:quant-ph/9508027.
 7. L. K. Grover, "A fast quantum mechanical algorithm for database search",
    Proc. 28th ACM STOC (1996). arXiv:quant-ph/9605043.
+8. D. Deutsch and R. Jozsa, "Rapid solution of problems by quantum
+   computation", Proc. R. Soc. Lond. A 439, 553 (1992).
 
 ## License
 

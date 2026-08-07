@@ -107,6 +107,9 @@ const appjs = read('app.js');
 ok(/Q\.partialOp\(/.test(appjs), 'Bloch sweep animates via Q.partialOp (fractional gates)');
 ok(/prefers-reduced-motion/.test(appjs), 'Bloch sweep respects prefers-reduced-motion');
 ok(/removeOpAt\(/.test(appjs), 'single-step delete (removeOpAt) is wired up');
+ok(/Deutsch/.test(html) && /phase kickback/i.test(html),
+   'index.html teaches Deutsch\'s algorithm and phase kickback');
+ok(/Q\.deutschCircuit\(/.test(appjs), 'app.js wires a Deutsch preset from Q.deutschCircuit');
 
 /* ---------- self-test harness (?selftest=1) ---------- */
 const selftest = read('selftest.js');
@@ -119,7 +122,9 @@ ok(/require\('\.\/sim\.js'\)/.test(selftest) && /process\.exit/.test(selftest),
    'selftest.js is runnable as a Node gate (node selftest.js, exits non-zero on failure)');
 ok(/isUnitary/.test(selftest) && /concurrence|productDet/.test(selftest),
    'selftest.js checks gate unitarity and Bell non-factorability against the real routines');
-for (const ref of ['1801.00862', '1905.09749', 'Nielsen', 'Preskill', 'learning\\.quantum\\.ibm\\.com']) {
+ok(/deutschRun|deutschCircuit/.test(selftest),
+   'selftest.js exercises the Deutsch algorithm (browser + Node stay in sync)');
+for (const ref of ['1801.00862', '1905.09749', 'Nielsen', 'Preskill', 'learning\\.quantum\\.ibm\\.com', 'Deutsch']) {
   ok(new RegExp(ref).test(html), 'reference present in page: ' + ref.replace('\\\\', '\\'));
 }
 

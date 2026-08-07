@@ -250,6 +250,62 @@ const QSim = (() => {
   const concurrence = (state) => 2 * cabs(productDet(state));
   const isEntangled = (state, eps) => concurrence(state) > (eps || 1e-9);
 
+  /* ---------------- Deutsch's algorithm (1-bit Deutsch–Jozsa) ----------------
+   * The smallest program where a quantum computer beats a classical one, and a
+   * clean demonstration of PHASE KICKBACK. You are handed f:{0,1}->{0,1} as a
+   * black box and asked: is it CONSTANT (same output for both inputs) or
+   * BALANCED (different)? Classically you must look at both f(0) and f(1) — two
+   * queries. This circuit queries the oracle U_f exactly ONCE and then measures
+   * the input qubit: 0 => constant, 1 => balanced, with certainty.
+   *
+   * q0 = input x, q1 = ancilla. The ancilla is prepared in |−>; the oracle map
+   * |x>|y> -> |x>|y⊕f(x)> then only multiplies |−> by (−1)^f(x), so it stamps a
+   * PHASE (−1)^f(x) onto the |x> branch and leaves the ancilla untouched
+   * (kickback). Consequently the oracle never entangles the two qubits — not
+   * even the f(x)=x oracle, which is literally a CNOT. Everything below is
+   * COMPOSED from gates the simulator already has (H, X, CNOT) and run through
+   * runOps; no new physics is defined here.
+   *
+   * HONEST SCOPE: with a single input bit the advantage is 1 query vs 2 — real
+   * and exact, but modest. The famous EXPONENTIAL Deutsch–Jozsa separation needs
+   * n input qubits (one query vs up to 2^{n-1}+1 classical) and more than the
+   * two qubits this simulator models. What is verifiable here is the mechanism,
+   * not a large separation.
+   */
+  const DEUTSCH_ORACLES = {
+    'constant-0':   { label: 'f(x) = 0 (constant)',     kind: 'constant', table: [0, 0], ops: () => [] },
+    'constant-1':   { label: 'f(x) = 1 (constant)',     kind: 'constant', table: [1, 1], ops: () => [{ gate: 'X', target: 1 }] },
+    'balanced-id':  { label: 'f(x) = x (balanced)',     kind: 'balanced', table: [0, 1], ops: () => [{ gate: 'CNOT', control: 0, target: 1 }] },
+    'balanced-not': { label: 'f(x) = NOT x (balanced)', kind: 'balanced', table: [1, 0], ops: () => [{ gate: 'CNOT', control: 0, target: 1 }, { gate: 'X', target: 1 }] },
+  };
+  // Full circuit for one oracle: prep (input |+>, ancilla |−>), the single
+  // oracle query, then H on the input to interfere the kicked-back phases.
+  function deutschCircuit(name) {
+    const o = DEUTSCH_ORACLES[name];
+    if (!o) throw new Error('unknown Deutsch oracle: ' + name);
+    return [
+      { gate: 'X', target: 1 },   // ancilla |0> -> |1>
+      { gate: 'H', target: 0 },   // input   -> |+>
+      { gate: 'H', target: 1 },   // ancilla -> |−>
+      ...o.ops(),                 // U_f  (the one and only query)
+      { gate: 'H', target: 0 },   // interfere: constant -> |0>, balanced -> |1>
+    ];
+  }
+  // Run the circuit and read the verdict off the input qubit q0. Index into the
+  // 2-qubit state is q0*2 + q1, so q0 = 1 is indices 2 and 3.
+  function deutschRun(name) {
+    const state = runOps(deutschCircuit(name), 2);
+    const p = probabilities(state);
+    const pOne = p[2] + p[3]; // marginal P(q0 = 1)
+    return {
+      name: name,
+      oracle: DEUTSCH_ORACLES[name],
+      verdict: pOne > 0.5 ? 'balanced' : 'constant',
+      pOne: pOne,
+      state: state,
+    };
+  }
+
   /* ---------------- formatting ---------------- */
   const fmt = (x, d) => {
     const dd = (d === undefined) ? 3 : d;
@@ -358,6 +414,8 @@ const QSim = (() => {
     // bloch + entanglement
     blochVector: blochVector, reducedBloch: reducedBloch,
     productDet: productDet, concurrence: concurrence, isEntangled: isEntangled,
+    // Deutsch's algorithm (composed from the gates above; no new physics)
+    DEUTSCH_ORACLES: DEUTSCH_ORACLES, deutschCircuit: deutschCircuit, deutschRun: deutschRun,
     // formatting + explainer
     fmt: fmt, fmtComplex: fmtComplex, degOf: degOf, describeStep: describeStep,
   };

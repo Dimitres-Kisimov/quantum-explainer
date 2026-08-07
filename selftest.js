@@ -14,7 +14,7 @@
  *   - In the browser:  open the app with ?selftest=1  (app.js renders PASS n/n).
  *   - In Node (a gate): node selftest.js               (prints PASS n/n, exit 0/1).
  *
- * It is intentionally a subset of the 81-assertion Node harness, not a
+ * It is intentionally a subset of the 107-assertion Node harness, not a
  * replacement for it — the goal is a runtime, no-dependency sanity check a
  * learner (or a reviewer on a phone) can trust, not a second source of truth
  * for the physics. Everything here is deterministic: the only sampling uses a
@@ -180,6 +180,27 @@
       ok(approx(b0.z, 1) && approx(b0.x, 0) && approx(b0.y, 0), 'blochVector(|0>) = +z pole');
       const bp = Q.blochVector(Q.runOps([H0], 1));
       ok(approx(bp.x, 1) && approx(bp.theta, P / 2), 'blochVector(H|0>) = +x (theta = pi/2)');
+    }
+
+    /* ---- Deutsch's algorithm (1-bit Deutsch–Jozsa): one query decides
+       constant vs balanced, and phase kickback means the oracle never
+       entangles — even when it is literally a CNOT. ---- */
+    {
+      for (const name of ['constant-0', 'constant-1']) {
+        const r = Q.deutschRun(name);
+        ok(r.verdict === 'constant' && approx(r.pOne, 0),
+          'Deutsch ' + name + ': one query -> "constant" (input qubit measures 0)');
+      }
+      for (const name of ['balanced-id', 'balanced-not']) {
+        const r = Q.deutschRun(name);
+        ok(r.verdict === 'balanced' && approx(r.pOne, 1),
+          'Deutsch ' + name + ': one query -> "balanced" (input qubit measures 1)');
+      }
+      // the f(x)=x oracle is a CNOT, yet with the ancilla in |−> it kicks back a
+      // phase instead of entangling: the post-oracle state stays a product state.
+      const afterOracle = Q.runOps(Q.deutschCircuit('balanced-id').slice(0, -1), 2);
+      ok(approx(Q.concurrence(afterOracle), 0),
+        'phase kickback: the Deutsch oracle (a CNOT) leaves the state unentangled (concurrence 0)');
     }
 
     return summarize(results);

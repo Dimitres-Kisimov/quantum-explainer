@@ -746,6 +746,11 @@ const PRESETS = {
   hh:      { n: 1, ops: [{ gate: 'H', target: 0 }, { gate: 'H', target: 0 }], run: false },
   hzh:     { n: 1, ops: [{ gate: 'H', target: 0 }, { gate: 'Z', target: 0 }, { gate: 'H', target: 0 }], run: false },
   bell:    { n: 2, ops: [{ gate: 'H', target: 0 }, { gate: 'CNOT', control: 0, target: 1 }], run: true },
+  // Deutsch's algorithm — the op lists come straight from the simulator so the
+  // playground runs the exact circuit the tests verify. balanced-id's oracle is
+  // a CNOT that (via phase kickback) leaves the state a product state.
+  'deutsch-balanced': { n: 2, ops: Q.deutschCircuit('balanced-id'), run: true },
+  'deutsch-constant': { n: 2, ops: Q.deutschCircuit('constant-1'), run: true },
 };
 function loadPreset(name) {
   const p = PRESETS[name];
@@ -824,7 +829,7 @@ function renderSelfTest() {
   lede.className = 'small muted';
   lede.textContent = 'Every check below runs the real simulator (sim.js) live in this ' +
     'browser and asserts a known quantum fact. Deterministic: the only sampling uses a ' +
-    'fixed seed. The exhaustive proof is the 81-assertion Node harness (test/sim.test.mjs); ' +
+    'fixed seed. The exhaustive proof is the 107-assertion Node harness (test/sim.test.mjs); ' +
     'this is its portable core, so the math can be verified on any device with no tooling.';
   panel.appendChild(lede);
 

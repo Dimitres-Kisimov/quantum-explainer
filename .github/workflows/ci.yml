@@ -25,13 +25,13 @@ jobs:
           node --check test/sim.test.mjs
           node --check tools/verify.mjs
 
-      - name: Run simulator test harness (81 assertions)
+      - name: Run simulator test harness (107 assertions)
         run: node test/sim.test.mjs
 
       - name: Run the portable correctness self-test (also the in-browser ?selftest=1 suite)
         run: node selftest.js
 
-      - name: Run structural + offline verifier (75 checks)
+      - name: Run structural + offline verifier (79 checks)
         run: node tools/verify.mjs
 
       - name: Offline guard — no external asset references in app files

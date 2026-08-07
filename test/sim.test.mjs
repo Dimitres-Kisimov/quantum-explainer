@@ -292,6 +292,63 @@ const CN01 = { gate: 'CNOT', control: 0, target: 1 };
   ok(approx(Q.norm(Q.partialOp(mid, CN01, 0.42)), 1), 'partial CNOT preserves the norm mid-sweep');
 }
 
+/* ---------- Deutsch's algorithm (1-bit Deutsch–Jozsa) + phase kickback ---------- */
+{
+  const names = ['constant-0', 'constant-1', 'balanced-id', 'balanced-not'];
+  for (const name of names) {
+    const o = Q.DEUTSCH_ORACLES[name];
+    const r = Q.deutschRun(name);
+
+    // 1) a single oracle query decides constant vs balanced, with certainty
+    ok(r.verdict === o.kind, 'Deutsch ' + name + ': one query -> verdict "' + o.kind + '"');
+    const p = Q.probabilities(r.state);
+    if (o.kind === 'constant') {
+      ok(approx(p[0] + p[1], 1) && approx(p[2] + p[3], 0),
+         'Deutsch ' + name + ': input qubit measures 0 with certainty (P(q0=0) = 1)');
+    } else {
+      ok(approx(p[2] + p[3], 1) && approx(p[0] + p[1], 0),
+         'Deutsch ' + name + ': input qubit measures 1 with certainty (P(q0=1) = 1)');
+    }
+
+    // 2) phase kickback: after the single oracle query the state is STILL a
+    //    product state — the oracle imprinted a phase on the input, it did not
+    //    entangle. True even when the oracle is literally a CNOT (balanced-id).
+    const afterOracle = Q.runOps(Q.deutschCircuit(name).slice(0, -1), 2);
+    ok(approx(Q.concurrence(afterOracle), 0) && !Q.isEntangled(afterOracle),
+       'Deutsch ' + name + ': the oracle does NOT entangle (phase kickback, concurrence 0)');
+
+    // 3) the kicked-back phase lands on q0: constant -> ±|+> (Bloch +x),
+    //    balanced -> ±|−> (Bloch −x); the arrow stays full length (pure).
+    const rq0 = Q.reducedBloch(afterOracle, 0);
+    const expX = o.kind === 'constant' ? 1 : -1;
+    ok(approx(rq0.x, expX) && approx(rq0.len, 1),
+       'Deutsch ' + name + ': kickback puts q0 on ' + (expX > 0 ? '+x (|+>)' : '−x (|−>)') + ', length 1');
+
+    // 4) the ancilla is handed back untouched in |−> (Bloch −x)
+    const rq1 = Q.reducedBloch(afterOracle, 1);
+    ok(approx(rq1.x, -1) && approx(rq1.len, 1),
+       'Deutsch ' + name + ': ancilla returns to exactly |−> (untouched by the query)');
+
+    // 5) honesty: the whole circuit uses only gates the simulator actually has
+    ok(Q.deutschCircuit(name).every((op) => ['H', 'X', 'CNOT'].includes(op.gate)),
+       'Deutsch ' + name + ': built only from H, X, CNOT (no hidden gate)');
+  }
+
+  // the four oracles really are two constant + two balanced
+  const kinds = Object.values(Q.DEUTSCH_ORACLES).map((o) => o.kind);
+  ok(kinds.filter((k) => k === 'constant').length === 2 &&
+     kinds.filter((k) => k === 'balanced').length === 2,
+     'Deutsch: exactly two constant and two balanced oracles are provided');
+
+  // why one classical query is not enough: a constant and a balanced oracle can
+  // agree on f(0) and only differ at f(1) — the quantum circuit still separates
+  // them in a single query.
+  const c0 = Q.DEUTSCH_ORACLES['constant-0'].table;
+  const bid = Q.DEUTSCH_ORACLES['balanced-id'].table;
+  ok(c0[0] === bid[0] && c0[1] !== bid[1],
+     'Deutsch: constant-0 and balanced-id agree on f(0) but differ on f(1) (one classical query cannot tell them apart)');
+}
+
 /* ---------- summary ---------- */
 console.log('');
 console.log(pass + ' passed, ' + fail + ' failed');
