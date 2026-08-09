@@ -306,6 +306,76 @@ const QSim = (() => {
     };
   }
 
+  /* ---------------- Grover's search (2 qubits, amplitude amplification) ----
+   * Unstructured search: one of N = 4 items (|00>..|11>) is secretly marked,
+   * and the only tool is an ORACLE that answers a query by flipping the SIGN
+   * of the marked item's amplitude. Classically, checking items one at a time
+   * takes 2.25 queries on average (worst case 3) to find the mark among 4.
+   * Grover's circuit takes ONE query — and n = 2 is the special case where a
+   * single oracle-plus-diffusion iteration is EXACT: the marked item is then
+   * measured with probability 1.
+   *
+   * Everything is COMPOSED from gates the simulator already has (H, X, CNOT);
+   * no new physics is defined here. CZ = (I⊗H)·CNOT·(I⊗H) because H·X·H = Z —
+   * exactly diag(1,1,1,−1), no stray phase. The oracle conjugates CZ by X's so
+   * the −1 lands on the marked state; the diffusion is H⊗H·(flip the sign of
+   * |00>)·H⊗H = −(2|s><s| − I), the textbook "inversion about the mean" times
+   * a global phase of −1 that no measurement can see.
+   *
+   * Exact amplitudes for marked item m:
+   *   after H⊗H          : all four +1/2                    (P = 25% each)
+   *   after the oracle   : −1/2 on m, +1/2 elsewhere        (P STILL 25% each
+   *                        — the mark is a phase, invisible on its own)
+   *   after the diffusion: a -> 2·mean − a with mean = 1/4, so the marked
+   *                        −1/2 -> 1 and the others 1/2 -> 0; the circuit
+   *                        lands on −|m> (global −1), so P(m) = 1 exactly.
+   * Running the iteration TWICE overshoots: P(m) drops back to 25% —
+   * amplitude amplification is a rotation, not a monotone climb.
+   *
+   * HONEST SCOPE: in general Grover needs ~(π/4)·√N iterations — a QUADRATIC
+   * speedup, provably optimal for black-box search, not exponential; and the
+   * "database" is a function you can evaluate, not a warehouse of records.
+   * What is verifiable here is the mechanism, not a large speedup.
+   */
+  const GROVER_ITEMS = ['00', '01', '10', '11'];
+  const gH = (q) => ({ gate: 'H', target: q });
+  const gX = (q) => ({ gate: 'X', target: q });
+  // CZ from existing gates: H on the target turns CNOT's X into Z (H·X·H = Z).
+  const czOps = () => [gH(1), { gate: 'CNOT', control: 0, target: 1 }, gH(1)];
+  // Oracle O_m = diag(1,..,−1 at m,..,1): X's map |m> <-> |11>, CZ flips |11>,
+  // the same X's map back. One call to this list = one query.
+  function groverOracle(item) {
+    if (GROVER_ITEMS.indexOf(item) < 0) throw new Error('unknown Grover item: ' + item);
+    const flips = [];
+    if (item.charAt(0) === '0') flips.push(0);
+    if (item.charAt(1) === '0') flips.push(1);
+    return [...flips.map(gX), ...czOps(), ...flips.map(gX)];
+  }
+  // Diffusion: H⊗H · (X⊗X·CZ·X⊗X = flip the sign of |00>) · H⊗H — inversion
+  // about the mean, up to the overall −1 noted above.
+  const groverDiffusion = () =>
+    [gH(0), gH(1), gX(0), gX(1), ...czOps(), gX(0), gX(1), gH(0), gH(1)];
+  // Full circuit: uniform superposition, then k oracle+diffusion iterations
+  // (k defaults to 1 — exact on 2 qubits; k = 2 demonstrates the overshoot).
+  function groverCircuit(item, iterations) {
+    const k = iterations === undefined ? 1 : iterations;
+    const ops = [gH(0), gH(1)];
+    for (let i = 0; i < k; i++) ops.push(...groverOracle(item), ...groverDiffusion());
+    return ops;
+  }
+  function groverRun(item, iterations) {
+    const k = iterations === undefined ? 1 : iterations;
+    const state = runOps(groverCircuit(item, k), 2);
+    const index = parseInt(item, 2); // q0 is the left bit: index = q0·2 + q1
+    return {
+      item: item,
+      index: index,
+      iterations: k,
+      state: state,
+      pMarked: probabilities(state)[index],
+    };
+  }
+
   /* ---------------- formatting ---------------- */
   const fmt = (x, d) => {
     const dd = (d === undefined) ? 3 : d;
@@ -416,6 +486,9 @@ const QSim = (() => {
     productDet: productDet, concurrence: concurrence, isEntangled: isEntangled,
     // Deutsch's algorithm (composed from the gates above; no new physics)
     DEUTSCH_ORACLES: DEUTSCH_ORACLES, deutschCircuit: deutschCircuit, deutschRun: deutschRun,
+    // Grover's search (likewise composed from H, X, CNOT only)
+    GROVER_ITEMS: GROVER_ITEMS, groverOracle: groverOracle,
+    groverDiffusion: groverDiffusion, groverCircuit: groverCircuit, groverRun: groverRun,
     // formatting + explainer
     fmt: fmt, fmtComplex: fmtComplex, degOf: degOf, describeStep: describeStep,
   };

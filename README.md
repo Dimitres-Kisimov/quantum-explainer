@@ -57,7 +57,13 @@ cited to a real source (references below and in the app footer).
   (with the cancellation arithmetic written out), entanglement (a Bell-state
   walkthrough), and **Deutsch's algorithm** — the smallest circuit with a
   genuine (if modest) quantum advantage, used to show *phase kickback* and the
-  honest fact that a CNOT does not always entangle. Plus a "What quantum
+  honest fact that a CNOT does not always entangle — and **Grover's search**
+  on two qubits: one oracle query plus a diffusion step finds a marked item
+  among four with certainty, with the exact amplitudes shown at every stage
+  (all ½ → sign flip on the mark, probabilities unchanged → inversion about
+  the mean piles everything onto the answer), plus the honest twists that the
+  query alone changes no probabilities and that running the iteration twice
+  overshoots back to 25%. Plus a "What quantum
   computers are NOT" section covering the parallel-worlds myth, NISQ-era
   limits, decoherence, error-correction overhead, and why your encryption is
   not being broken today — and a "where they may genuinely help" section with
@@ -95,9 +101,9 @@ Everything is checkable from a stock Node installation:
 
 ```
 node --check sim.js app.js selftest.js sw.js   # syntax
-node test/sim.test.mjs               # 107 physics/behaviour assertions
-node selftest.js                     # portable correctness self-test (39 checks)
-node tools/verify.mjs                # manifest, precache, offline guard (79 checks)
+node test/sim.test.mjs               # 154 physics/behaviour assertions
+node selftest.js                     # portable correctness self-test (46 checks)
+node tools/verify.mjs                # manifest, precache, offline guard (86 checks)
 ```
 
 **In-browser self-test.** A teaching tool should be able to prove — on the
@@ -108,7 +114,9 @@ the same correctness suite (`selftest.js`) live against the real simulator: stat
 vectors stay normalized (probabilities sum to 1), the standard gates are unitary
 (U†U = I), H|0⟩ → 50/50, X|0⟩ → |1⟩, H·H|0⟩ → |0⟩ (interference), the Bell
 circuit gives {00: 0.5, 11: 0.5} with 01/10 impossible and a non-factorable
-state, and seeded measurement frequencies match the Born rule |amplitude|². The
+state, seeded measurement frequencies match the Born rule |amplitude|², and
+Grover's one-query search finds each of the four markable items with
+certainty (while the query alone leaves every probability at 25%). The
 result is also on `window.__selftest` and the `<html data-selftest>` attribute
 for scripting. It is deterministic (the only sampling uses a fixed seed) and is
 a portable subset of the exhaustive Node harness, not a replacement for it — the
@@ -126,8 +134,17 @@ t = 0, the true gate at t = 1 (exactly, for CNOT — no stray control phase),
 and norm-preserving mid-sweep. For Deutsch's algorithm it checks all four
 oracles: a single query yields the correct constant/balanced verdict with
 certainty, and the oracle leaves the state a product state (concurrence 0) —
-phase kickback, not entanglement — even when the oracle is a CNOT. The
-verifier proves the app references no external asset of any kind.
+phase kickback, not entanglement — even when the oracle is a CNOT. For
+Grover's search it checks all four marked items with hand-computed amplitudes
+at every stage: the uniform state is exactly (½,½,½,½); the single query
+flips only the marked amplitude's sign and leaves every probability at 25%
+(the mark is invisible on its own); the diffusion is verified to map each
+amplitude to the inversion-about-the-mean value (mean exactly ¼); one
+iteration lands on the marked basis state with probability exactly 1 (1000
+seeded shots all agree); a second iteration overshoots back to exactly 25%;
+and the whole circuit is composed from H, X and CNOT only (the CZ inside is
+H·CNOT·H — no new gate primitive). The verifier proves the app references no
+external asset of any kind.
 
 `tools/make_icons.py` (Python + Pillow) regenerates the PNG icons from the
 same geometry as the hand-drawn `icons/icon.svg`.

@@ -103,9 +103,10 @@ def main():
         "entanglement appears honestly as both arrows collapsing to the centre of the sphere.",
         "Phase dials for every complex amplitude, animated gate sweeps along each gate's true "
         "rotation axis, and a step scrubber that replays any intermediate state.",
-        "Cited lessons - superposition, measurement, interference, entanglement - plus \"What "
+        "Cited lessons - superposition, measurement, interference, entanglement, Deutsch's "
+        "algorithm (phase kickback) and Grover's search (amplitude amplification) - plus \"What "
         "quantum computers are NOT\": the parallel-worlds myth, NISQ-era limits, decoherence, "
-        "error-correction overhead. Seven references, Nielsen & Chuang to Preskill 2018.",
+        "error-correction overhead. Eight references, Nielsen & Chuang to Deutsch & Jozsa.",
         "A real PWA: manifest, precaching service worker, original icons. No frameworks, no "
         "build step, no CDNs, no analytics - fully offline after the first visit.",
     ])
@@ -115,8 +116,8 @@ def main():
     y = bullets(fig, y, [
         str(sim_n) + " physics/behaviour assertions pass in plain Node (node test/sim.test.mjs): "
         "H|0> gives 50/50, H.H interference returns |0>, the Bell state measures "
-        "{00: 0.5, 11: 0.5} and fails the factorability check, RY(pi) = X up to global phase, "
-        "norms stay 1 to 1e-10 through long circuits.",
+        "{00: 0.5, 11: 0.5} and fails the factorability check, Deutsch's algorithm answers in "
+        "one query, and Grover's one-iteration search finds the marked item with certainty.",
         str(ver_n) + " structural checks pass (node tools/verify.mjs): manifest and icon "
         "integrity, service-worker precache completeness, citation presence, and an offline "
         "guard proving the app references no external asset of any kind.",

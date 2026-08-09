@@ -751,6 +751,11 @@ const PRESETS = {
   // a CNOT that (via phase kickback) leaves the state a product state.
   'deutsch-balanced': { n: 2, ops: Q.deutschCircuit('balanced-id'), run: true },
   'deutsch-constant': { n: 2, ops: Q.deutschCircuit('constant-1'), run: true },
+  // Grover's search — likewise the exact op lists the tests verify. One
+  // iteration on 2 qubits is exact (all 1000 shots land on the marked item);
+  // running it twice overshoots back to 25% — the lesson's honesty demo.
+  'grover-10':        { n: 2, ops: Q.groverCircuit('10', 1), run: true },
+  'grover-overshoot': { n: 2, ops: Q.groverCircuit('10', 2), run: true },
 };
 function loadPreset(name) {
   const p = PRESETS[name];
@@ -829,7 +834,7 @@ function renderSelfTest() {
   lede.className = 'small muted';
   lede.textContent = 'Every check below runs the real simulator (sim.js) live in this ' +
     'browser and asserts a known quantum fact. Deterministic: the only sampling uses a ' +
-    'fixed seed. The exhaustive proof is the 107-assertion Node harness (test/sim.test.mjs); ' +
+    'fixed seed. The exhaustive proof is the 154-assertion Node harness (test/sim.test.mjs); ' +
     'this is its portable core, so the math can be verified on any device with no tooling.';
   panel.appendChild(lede);
 

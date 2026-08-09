@@ -19,18 +19,23 @@ important — what today's noisy, small machines cannot do.
 
 - **A verified simulator, not slideware.** Every state the app shows comes
   from a hand-written 1–2 qubit state-vector simulator (`sim.js`, zero
-  dependencies) covered by **107 physics/behaviour assertions** in plain Node:
+  dependencies) covered by **154 physics/behaviour assertions** in plain Node:
   H|0⟩ gives 50/50, H·H interference returns |0⟩, the Bell state measures
   {00: 0.5, 11: 0.5} with a failing factorability check, RY(π) ≈ X up to
-  global phase, norms stay 1 to 1e-10 through long circuits, and Deutsch's
-  algorithm returns the right constant/balanced verdict from a single query.
+  global phase, norms stay 1 to 1e-10 through long circuits, Deutsch's
+  algorithm returns the right constant/balanced verdict from a single query,
+  and Grover's one-iteration search on two qubits lands on the marked item
+  with probability exactly 1 (and provably overshoots back to 25% if run
+  twice).
 - **Visual intuition with the numbers attached.** A draggable Bloch sphere
   (reduced states in two-qubit mode, so entanglement is honestly drawn as
   both arrows collapsing to the centre), phase dials for every complex
   amplitude, animated gate sweeps along each gate's true rotation axis, and a
   step scrubber to replay any intermediate state.
 - **Cited lessons, including the anti-hype one.** Learn mode covers
-  superposition, measurement, interference, and entanglement — plus a
+  superposition, measurement, interference, entanglement, Deutsch's
+  algorithm (phase kickback) and Grover's search (amplitude amplification,
+  with its overshoot honestly demonstrated) — plus a
   dedicated **"What quantum computers are NOT"** section (parallel-worlds
   myth, NISQ limits, decoherence, error-correction overhead, why RSA is not
   being broken today). Every claim is demonstrated live on the simulator or
@@ -52,8 +57,8 @@ important — what today's noisy, small machines cannot do.
 
 ## Measured quality evidence
 
-- **107 simulator assertions** pass in plain Node (`node test/sim.test.mjs`).
-- **79 structural checks** pass (`node tools/verify.mjs`): manifest and icon
+- **154 simulator assertions** pass in plain Node (`node test/sim.test.mjs`).
+- **86 structural checks** pass (`node tools/verify.mjs`): manifest and icon
   integrity, service-worker precache completeness, citation presence, and an
   offline guard proving the app references **no external asset of any kind**.
 - **Live, installable PWA** at

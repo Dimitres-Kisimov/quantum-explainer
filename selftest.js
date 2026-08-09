@@ -14,7 +14,7 @@
  *   - In the browser:  open the app with ?selftest=1  (app.js renders PASS n/n).
  *   - In Node (a gate): node selftest.js               (prints PASS n/n, exit 0/1).
  *
- * It is intentionally a subset of the 107-assertion Node harness, not a
+ * It is intentionally a subset of the 154-assertion Node harness, not a
  * replacement for it — the goal is a runtime, no-dependency sanity check a
  * learner (or a reviewer on a phone) can trust, not a second source of truth
  * for the physics. Everything here is deterministic: the only sampling uses a
@@ -201,6 +201,25 @@
       const afterOracle = Q.runOps(Q.deutschCircuit('balanced-id').slice(0, -1), 2);
       ok(approx(Q.concurrence(afterOracle), 0),
         'phase kickback: the Deutsch oracle (a CNOT) leaves the state unentangled (concurrence 0)');
+    }
+
+    /* ---- Grover's search on 2 qubits: one query + diffusion finds the
+       marked item with certainty (N = 4 is the exact case); the query alone
+       changes no probabilities; a second iteration overshoots to 25%. ---- */
+    {
+      for (const item of ['00', '01', '10', '11']) {
+        const r = Q.groverRun(item, 1);
+        ok(approx(r.pMarked, 1),
+          'Grover ' + item + ': one oracle query + diffusion -> P(|' + item + '>) = 1 (certainty)');
+      }
+      const circ = Q.groverCircuit('10', 1);
+      const afterOracle = Q.runOps(circ.slice(0, circ.length - Q.groverDiffusion().length), 2);
+      ok(Q.probabilities(afterOracle).every((p) => approx(p, 0.25)),
+        'Grover: after the query alone every outcome is still 25% (the mark is a phase)');
+      ok(approx(Q.groverRun('10', 2).pMarked, 0.25),
+        'Grover: two iterations overshoot — P(marked) is back to 25% (amplification is a rotation)');
+      ok(circ.every((op) => ['H', 'X', 'CNOT'].indexOf(op.gate) >= 0),
+        'Grover: the whole circuit is composed only of H, X and CNOT');
     }
 
     return summarize(results);

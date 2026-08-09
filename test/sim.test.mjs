@@ -349,6 +349,110 @@ const CN01 = { gate: 'CNOT', control: 0, target: 1 };
      'Deutsch: constant-0 and balanced-id agree on f(0) but differ on f(1) (one classical query cannot tell them apart)');
 }
 
+/* ---------- Grover's search on 2 qubits (amplitude amplification) ---------- */
+{
+  ok(JSON.stringify(Q.GROVER_ITEMS) === JSON.stringify(['00', '01', '10', '11']),
+     'Grover: all four 2-qubit items are searchable');
+
+  for (const item of Q.GROVER_ITEMS) {
+    const idx = parseInt(item, 2); // q0 is the left bit
+    const circ = Q.groverCircuit(item, 1);
+
+    // stage 1 — uniform superposition: all four amplitudes exactly +1/2
+    const prep = Q.runOps(circ.slice(0, 2), 2);
+    ok(prep.every((a) => approx(a.re, 0.5) && approx(a.im, 0)),
+       'Grover ' + item + ': after H(x)H all four amplitudes are exactly +1/2');
+
+    // stage 2 — the single query: ONLY the marked amplitude flips sign
+    const afterOracle = Q.runOps(circ.slice(0, 2 + Q.groverOracle(item).length), 2);
+    ok(afterOracle.every((a, i) => approx(a.re, i === idx ? -0.5 : 0.5) && approx(a.im, 0)),
+       'Grover ' + item + ': the oracle flips only the marked amplitude (' + item + ' -> -1/2, others +1/2)');
+    ok(Q.probabilities(afterOracle).every((p) => approx(p, 0.25)),
+       'Grover ' + item + ': after the query every probability is STILL 25% (the mark is a phase, invisible alone)');
+
+    // stage 3 — diffusion: 2*mean - a with mean 1/4, times the global -1 the
+    // H/X/CNOT construction carries, lands on exactly -|marked>
+    const fin = Q.runOps(circ, 2);
+    ok(fin.every((a, i) => approx(a.re, i === idx ? -1 : 0) && approx(a.im, 0)),
+       'Grover ' + item + ': final amplitudes exactly -1 on |' + item + '>, 0 elsewhere (global phase -1)');
+    ok(approx(Q.probabilities(fin)[idx], 1),
+       'Grover ' + item + ': ONE query finds the marked item with certainty (P = 1)');
+
+    // entanglement bookkeeping: the query maximally entangles (unlike the
+    // Deutsch kickback), the diffusion disentangles into the answer
+    ok(approx(Q.concurrence(afterOracle), 1) && Q.isEntangled(afterOracle),
+       'Grover ' + item + ': the query entangles the register (concurrence 1)');
+    ok(approx(Q.concurrence(fin), 0) && !Q.isEntangled(fin),
+       'Grover ' + item + ': the diffusion disentangles it into a basis state (concurrence 0)');
+
+    // honesty: composed only from gates the simulator actually has
+    ok(circ.every((op) => ['H', 'X', 'CNOT'].includes(op.gate)),
+       'Grover ' + item + ': built only from H, X, CNOT (CZ is H.CNOT.H — no hidden gate)');
+
+    // the runner reports the same physics
+    const r = Q.groverRun(item, 1);
+    ok(r.index === idx && approx(r.pMarked, 1),
+       'Grover ' + item + ': groverRun reports index ' + idx + ' with pMarked = 1');
+  }
+
+  // the oracle is diagonal: on basis states it flips only the marked one
+  const on10 = [{ gate: 'X', target: 0 }]; // prepare |10>
+  const hit = Q.runOps([...on10, ...Q.groverOracle('10')], 2);
+  ok(approx(hit[2].re, -1) && approx(Q.norm(hit), 1),
+     'Grover oracle(10) on |10> gives exactly -|10> (a pure sign flip)');
+  const miss = Q.runOps([...on10, ...Q.groverOracle('01')], 2);
+  ok(approx(miss[2].re, 1),
+     'Grover oracle(01) on |10> leaves it exactly |10> (no phase on unmarked states)');
+
+  // diffusion = inversion about the mean (times the construction's global -1):
+  // every amplitude obeys  out = -(2*mean - in)
+  {
+    const v = Q.runOps([...Q.groverCircuit('11', 1).slice(0, 2), ...Q.groverOracle('11')], 2);
+    const mean = v.reduce((t, a) => t + a.re, 0) / 4;
+    const out = Q.groverDiffusion().reduce((s, op) => Q.applyOp(s, op), v);
+    ok(approx(mean, 0.25) &&
+       out.every((a, i) => approx(a.re, -(2 * mean - v[i].re)) && approx(a.im, 0)),
+       'Grover diffusion: every amplitude maps to -(2*mean - a) with mean exactly 1/4 (inversion about the mean)');
+  }
+
+  // overshoot: a second iteration rotates PAST the target — P(marked) is back
+  // to exactly 25%, with hand-computed amplitudes (+1/2 marked, -1/2 others)
+  const over = Q.groverRun('01', 2);
+  ok(approx(over.pMarked, 0.25),
+     'Grover overshoot: two iterations give P(marked) exactly 0.25 again (rotation, not monotone climb)');
+  ok(over.state.every((a, i) => approx(a.re, i === 1 ? 0.5 : -0.5) && approx(a.im, 0)),
+     'Grover overshoot: amplitudes exactly +1/2 on the marked item, -1/2 elsewhere');
+
+  // defaults + determinism + sampling
+  ok(Q.groverRun('11').iterations === 1 &&
+     approx(Q.fidelity(Q.groverRun('11').state, Q.groverRun('11', 1).state), 1),
+     'Grover: groverRun defaults to exactly one iteration');
+  const g1 = Q.groverRun('10', 1), g2 = Q.groverRun('10', 1);
+  ok(g1.state.every((a, i) => a.re === g2.state[i].re && a.im === g2.state[i].im),
+     'Grover: deterministic — two runs give bit-identical amplitudes');
+  const gs = Q.measureShots(g1.state, 1000, 42);
+  ok(gs.counts['10'] === 1000 && gs.counts['00'] + gs.counts['01'] + gs.counts['11'] === 0,
+     'Grover: 1000 seeded shots ALL land on the marked item (certainty, not statistics)');
+
+  // norm preserved through every one of the composed steps
+  {
+    let s = Q.zeroState(2), worst = 0;
+    for (const op of Q.groverCircuit('00', 2)) {
+      s = Q.applyOp(s, op);
+      worst = Math.max(worst, Math.abs(Q.norm(s) - 1));
+    }
+    ok(worst <= 1e-10,
+       'Grover: norm preserved at every step of the 38-gate two-iteration circuit (drift ' + worst.toExponential(2) + ')');
+  }
+
+  // unknown item name must throw, not mis-search
+  {
+    let threw = false;
+    try { Q.groverOracle('2'); } catch (e) { threw = true; }
+    ok(threw, 'Grover: groverOracle rejects an unknown item label');
+  }
+}
+
 /* ---------- summary ---------- */
 console.log('');
 console.log(pass + ' passed, ' + fail + ' failed');
