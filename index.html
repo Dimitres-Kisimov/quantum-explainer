@@ -153,7 +153,7 @@
 
     <div class="houserules panel">
       <h2>House rules</h2>
-      <p>Every claim on this page is either demonstrated live on the simulator or backed by a reference [1–8] listed in the footer. If a sentence sounds like marketing, it doesn't belong here.</p>
+      <p>Every claim on this page is either demonstrated live on the simulator or backed by a reference [1–9] listed in the footer. If a sentence sounds like marketing, it doesn't belong here.</p>
     </div>
 
     <article class="lesson panel">
@@ -221,15 +221,27 @@
       <p>Watch the amplitudes do it. H on both qubits puts all four items at amplitude ½ — 25% each. The oracle spends the single query flipping the <em>sign</em> of the marked amplitude: ½ → −½. Crucially, all four probabilities are <strong>still 25%</strong> — squaring erases the sign, so the query alone tells a measurement nothing (the same hidden-phase honesty as lesson 3). The <em>diffusion</em> step then converts the mark into odds by inverting every amplitude about their mean: the mean is (½+½+½−½)/4 = ¼, and a → 2·mean − a sends the three unmarked ½ → 0 and the marked −½ → <strong>1</strong>. All the probability now sits on the marked item — one measurement reads the answer with certainty. Scrub the steps and watch it happen.</p>
       <p>Two honest details to check on the simulator. First, the circuit lands on −|marked⟩ — every phase dial points backwards at 180°. That minus sign is a <em>global</em> phase from how the diffusion is composed here (H, X and CNOT only; the oracle's CZ is H·CNOT·H — no gate this app doesn't have), and a global phase is invisible to every possible measurement. Second, the oracle <em>entangles</em> the register — the product check reads magnitude 0.5 after the query — the opposite of Deutsch's kickback in lesson 5; the diffusion then disentangles it into the answer.</p>
       <p><strong>More is not better:</strong> run the oracle-plus-diffusion iteration <em>twice</em> and P(marked) falls back to 25% — no better than guessing. Amplitude amplification is a rotation toward the target; keep rotating and you swing past it. Grover's famous ~√N query count is precisely "stop at the right moment".</p>
-      <p><strong>Honest scope:</strong> N = 4 is the case where one iteration is exact. In general Grover needs ~(π/4)·√N iterations for N items — a <em>quadratic</em> speedup, provably the best possible for black-box search [5][7], not exponential, and it does not make NP-complete problems easy (lesson 7). The "database" is a function you can evaluate, not a warehouse of records. What you can verify here is the mechanism — amplitude amplification — not a large speedup.</p>
+      <p><strong>Honest scope:</strong> N = 4 is the case where one iteration is exact. In general Grover needs ~(π/4)·√N iterations for N items — a <em>quadratic</em> speedup, provably the best possible for black-box search [5][7], not exponential, and it does not make NP-complete problems easy (lesson 8). The "database" is a function you can evaluate, not a warehouse of records. What you can verify here is the mechanism — amplitude amplification — not a large speedup.</p>
       <p class="try">
         <button class="trybtn" data-preset="grover-10">Try it: mark |10⟩ — one query, and 1000 shots all read 10</button>
         <button class="trybtn" data-preset="grover-overshoot">Try it: the same iteration twice — overshoot back to 25%</button>
       </p>
     </article>
 
+    <article class="lesson panel">
+      <h3>7 · Superdense coding — two bits in one sent qubit</h3>
+      <p>Alice must deliver <strong>two classical bits</strong> to Bob, but she is only allowed to send him <strong>one qubit</strong>. On its own that is impossible: a lone qubit, measured, yields at most one classical bit — Holevo's bound [1, ch. 12]. The way around is a resource prepared earlier: a Bell pair the two <em>already share</em> — q0 in Alice's hands, q1 in Bob's [9].</p>
+      <p>The protocol is three short stages, and this simulator runs all of them. <strong>Share:</strong> H then CNOT makes (|00⟩ + |11⟩)/√2 — the lesson-4 Bell state, distributed before any message exists. <strong>Encode:</strong> Alice applies gates to <em>her qubit only</em>: nothing for 00, X for 01, Z for 10, X then Z for 11. The four results are exactly the four <em>Bell states</em> — mutually orthogonal, which is the whole reason two bits fit. She then sends her one qubit to Bob. <strong>Decode:</strong> Bob runs CNOT then H — the rotation that turns the Bell basis into the ordinary 0/1 basis (this simulator only measures in the 0/1 basis, so the "Bell measurement" is honestly <em>built</em> that way, the standard construction) — and measures both qubits. He reads exactly Alice's two bits, with certainty: the final amplitude is +1 on |b₀b₁⟩ and 0 everywhere else, with not even a global phase left over.</p>
+      <p>Scrub the steps and watch the honest details. After Alice encodes 10, the state is (|00⟩ − |11⟩)/√2: the |11⟩ phase dial points backwards at 180° while the probabilities still read 50/50 — <strong>her encoding changes nothing that can be measured locally</strong>. Both reduced Bloch arrows sit at the centre of the sphere for every one of the four encodings, and running 1000 shots on the encoded pair gives counts <em>identical</em> to the plain Bell pair with the same seed. That is no-signalling made concrete: no information moves until the qubit is physically carried across. And yet, by touching one qubit, Alice steered the joint state between four perfectly distinguishable states — the message lives in the correlation, exactly where lesson 4 said an entangled pair keeps its information.</p>
+      <p><strong>Honest scope:</strong> two qubits are used in total — one of them was shipped ahead of time as pre-shared entanglement, before the message existed. Superdense coding doubles the classical capacity of the qubit Alice <em>sends</em>, given that resource [9]; it does not pack two bits into an isolated qubit, does not beat Holevo's bound, and nothing here travels faster than light. What you can verify on this simulator is the mechanism: local encoding into orthogonal Bell states, decoded with certainty.</p>
+      <p class="try">
+        <button class="trybtn" data-preset="superdense-10">Try it: send 10 — Bob's 1000 shots all read 10</button>
+        <button class="trybtn" data-preset="superdense-hidden">Try it: stop before the decode — the counts match the plain Bell pair</button>
+      </p>
+    </article>
+
     <article class="lesson panel" id="lesson-not">
-      <h3>7 · What quantum computers are NOT</h3>
+      <h3>8 · What quantum computers are NOT</h3>
       <ul class="mythlist">
         <li><strong>Not faster at everything.</strong> Known speedups apply to specific problem families. For most computing — spreadsheets, video, databases, almost everything data centres do — there is no quantum speedup and classical machines remain the right tool. Quantum computers are not expected to solve NP-complete problems efficiently; for brute-force search the provable limit is Grover's <em>quadratic</em> speedup, no better [5].</li>
         <li><strong>Not "trying all answers in parallel".</strong> Putting a register into a superposition over all inputs is one H per qubit — the trivial part. A measurement then returns <em>one</em> outcome. Useful algorithms must arrange interference so wrong answers cancel, and only a few problem structures are known to allow that [1].</li>
@@ -242,7 +254,7 @@
     </article>
 
     <article class="lesson panel">
-      <h3>8 · Where they may genuinely help</h3>
+      <h3>9 · Where they may genuinely help</h3>
       <ul>
         <li><strong>Simulating quantum systems</strong> (molecules, materials): the original motivation and the most natural fit — a quantum system simulating another quantum system without the 2ⁿ blow-up [1][2].</li>
         <li><strong>Factoring and discrete logarithms:</strong> Shor's algorithm runs in polynomial time in the number of digits [6], versus sub-exponential for the best known classical method. This is why RSA and elliptic-curve cryptography are considered at risk <em>once</em> large fault-tolerant machines exist [4] — and why replacements are being standardized already.</li>
@@ -252,7 +264,7 @@
     </article>
 
     <article class="lesson panel">
-      <h3>9 · What this simulator is (and isn't)</h3>
+      <h3>10 · What this simulator is (and isn't)</h3>
       <p>This page stores the full state vector — 2 amplitudes for one qubit, 4 for two — and multiplies small matrices, exactly the arithmetic defined in the textbooks [1]. It is noiseless and tiny <em>on purpose</em>: 1–2 qubits is the regime where the mathematics can be shown completely and honestly. A phone can simulate ~20 qubits this way; nothing classical can go far beyond ~50. The teaching value is that what you see here is the real formalism, not an artist's impression.</p>
     </article>
 
@@ -275,6 +287,7 @@
       <li>P. W. Shor, "Polynomial-Time Algorithms for Prime Factorization and Discrete Logarithms on a Quantum Computer", SIAM Journal on Computing 26, 1484 (1997). arXiv:quant-ph/9508027.</li>
       <li>L. K. Grover, "A fast quantum mechanical algorithm for database search", Proc. 28th ACM STOC (1996). arXiv:quant-ph/9605043.</li>
       <li>D. Deutsch and R. Jozsa, "Rapid solution of problems by quantum computation", Proceedings of the Royal Society of London A 439, 553 (1992).</li>
+      <li>C. H. Bennett and S. J. Wiesner, "Communication via one- and two-particle operators on Einstein-Podolsky-Rosen states", Physical Review Letters 69, 2881 (1992).</li>
     </ol>
     <p class="small muted">© 2026 Dimitres Kisimov — all rights reserved; published for portfolio review. See LICENSE.</p>
   </div>

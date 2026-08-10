@@ -14,7 +14,7 @@
  *   - In the browser:  open the app with ?selftest=1  (app.js renders PASS n/n).
  *   - In Node (a gate): node selftest.js               (prints PASS n/n, exit 0/1).
  *
- * It is intentionally a subset of the 154-assertion Node harness, not a
+ * It is intentionally a subset of the 201-assertion Node harness, not a
  * replacement for it — the goal is a runtime, no-dependency sanity check a
  * learner (or a reviewer on a phone) can trust, not a second source of truth
  * for the physics. Everything here is deterministic: the only sampling uses a
@@ -220,6 +220,34 @@
         'Grover: two iterations overshoot — P(marked) is back to 25% (amplification is a rotation)');
       ok(circ.every((op) => ['H', 'X', 'CNOT'].indexOf(op.gate) >= 0),
         'Grover: the whole circuit is composed only of H, X and CNOT');
+    }
+
+    /* ---- superdense coding: two classical bits through one sent qubit,
+       using a pre-shared Bell pair; Alice's encoding is local (q0 only) and
+       locally invisible until Bob decodes. ---- */
+    {
+      for (const msg of ['00', '01', '10', '11']) {
+        const r = Q.superdenseRun(msg);
+        ok(approx(r.pMessage, 1),
+          'superdense ' + msg + ': Bob decodes both bits with certainty (P(|' + msg + '>) = 1)');
+      }
+      // after Alice encodes, each qubit alone is still maximally mixed — the
+      // message leaves no local trace (no-signalling)
+      const circ = Q.superdenseCircuit('11');
+      const encoded = Q.runOps(circ.slice(0, circ.length - 2), 2);
+      const r0 = Q.reducedBloch(encoded, 0), r1 = Q.reducedBloch(encoded, 1);
+      ok(approx(r0.len, 0) && approx(r1.len, 0),
+        'superdense: after the encoding both reduced Bloch lengths are 0 (no local trace of the message)');
+      // the phase-flip message gives counts identical to the untouched Bell
+      // pair (same seed): nothing observable moves before the decode
+      const bell = Q.runOps([H0, CN01], 2);
+      const c10 = Q.superdenseCircuit('10');
+      const enc10 = Q.runOps(c10.slice(0, c10.length - 2), 2);
+      ok(JSON.stringify(Q.measureShots(bell, 2000, FIXED_SEED).counts) ===
+         JSON.stringify(Q.measureShots(enc10, 2000, FIXED_SEED).counts),
+        'superdense: the encoded "10" pair gives counts identical to the plain Bell pair (invisible before the decode)');
+      ok(circ.every((op) => ['H', 'X', 'Z', 'CNOT'].indexOf(op.gate) >= 0),
+        'superdense: the whole circuit is composed only of H, X, Z and CNOT');
     }
 
     return summarize(results);

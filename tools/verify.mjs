@@ -122,6 +122,15 @@ ok(/groverOracle/.test(simjs) && /groverDiffusion/.test(simjs) && /groverRun/.te
    'sim.js composes the Grover oracle, diffusion and runner');
 ok(!/GATES\.CZ|'CZ'/.test(simjs),
    'Grover adds no new gate primitive: CZ is composed, not defined');
+ok(/[Ss]uperdense coding/.test(html) && /Bell measurement/i.test(html),
+   'index.html teaches superdense coding and the Bell-measurement decode');
+ok(/Holevo/.test(html) && /pre-shared|already share/i.test(html),
+   'index.html states superdense coding\'s honest scope (Holevo bound, pre-shared entanglement)');
+ok(/no-signalling/i.test(html) && /identical/.test(html),
+   'index.html makes the no-signalling point (encoded counts identical to the plain Bell pair)');
+ok(/Q\.superdenseCircuit\(/.test(appjs), 'app.js wires the superdense presets from Q.superdenseCircuit');
+ok(/superdenseEncodeOps/.test(simjs) && /superdenseCircuit/.test(simjs) && /superdenseRun/.test(simjs),
+   'sim.js composes the superdense encode, circuit and runner');
 
 /* ---------- self-test harness (?selftest=1) ---------- */
 const selftest = read('selftest.js');
@@ -138,7 +147,9 @@ ok(/deutschRun|deutschCircuit/.test(selftest),
    'selftest.js exercises the Deutsch algorithm (browser + Node stay in sync)');
 ok(/groverRun|groverCircuit/.test(selftest),
    'selftest.js exercises Grover\'s search (browser + Node stay in sync)');
-for (const ref of ['1801.00862', '1905.09749', 'Nielsen', 'Preskill', 'learning\\.quantum\\.ibm\\.com', 'Deutsch']) {
+ok(/superdenseRun|superdenseCircuit/.test(selftest),
+   'selftest.js exercises superdense coding (browser + Node stay in sync)');
+for (const ref of ['1801.00862', '1905.09749', 'Nielsen', 'Preskill', 'learning\\.quantum\\.ibm\\.com', 'Deutsch', 'Wiesner']) {
   ok(new RegExp(ref).test(html), 'reference present in page: ' + ref.replace('\\\\', '\\'));
 }
 

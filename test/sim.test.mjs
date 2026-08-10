@@ -453,6 +453,134 @@ const CN01 = { gate: 'CNOT', control: 0, target: 1 };
   }
 }
 
+/* ---------- superdense coding (2 classical bits via 1 sent qubit) ---------- */
+{
+  const r = Math.SQRT1_2;
+  ok(JSON.stringify(Q.SUPERDENSE_MESSAGES) === JSON.stringify(['00', '01', '10', '11']),
+     'superdense: all four 2-bit messages are encodable');
+
+  // hand-computed amplitudes of the four encoded Bell states (index = q0*2+q1)
+  const ENCODED = {
+    '00': [r, 0, 0, r],    // Phi+ = (|00>+|11>)/sqrt2
+    '01': [0, r, r, 0],    // Psi+ = (|01>+|10>)/sqrt2
+    '10': [r, 0, 0, -r],   // Phi- = (|00>-|11>)/sqrt2
+    '11': [0, r, -r, 0],   // Psi- = (|01>-|10>)/sqrt2
+  };
+  const lbl = (v) => (v > 0 ? '+r' : (v < 0 ? '-r' : '0'));
+
+  for (const msg of Q.SUPERDENSE_MESSAGES) {
+    const idx = parseInt(msg, 2); // q0 is the left bit
+    const circ = Q.superdenseCircuit(msg);
+    const enc = Q.superdenseEncodeOps(msg);
+
+    // stage 1 — the pre-shared pair: amplitudes exactly (1/sqrt2, 0, 0, 1/sqrt2)
+    const shared = Q.runOps(circ.slice(0, 2), 2);
+    ok(approx(shared[0].re, r) && approx(shared[3].re, r) &&
+       approx(Q.cabs(shared[1]), 0) && approx(Q.cabs(shared[2]), 0),
+       'superdense ' + msg + ': the shared pair is exactly (|00>+|11>)/sqrt2');
+
+    // stage 2 — Alice's local encoding lands on the hand-computed Bell state
+    const encoded = Q.runOps(circ.slice(0, 2 + enc.length), 2);
+    ok(encoded.every((a, i) => approx(a.re, ENCODED[msg][i]) && approx(a.im, 0)),
+       'superdense ' + msg + ': encoding gives the hand-computed Bell amplitudes (' +
+       ENCODED[msg].map(lbl).join(',') + ')');
+
+    // the encoding really is local: X/Z on q0 only, nothing ever touches q1
+    ok(enc.every((op) => op.target === 0 && op.control === undefined &&
+                         (op.gate === 'X' || op.gate === 'Z')),
+       'superdense ' + msg + ': the encoding is local — X/Z on q0 only, q1 untouched');
+
+    // locally invisible: each qubit alone stays maximally mixed...
+    const r0 = Q.reducedBloch(encoded, 0), r1 = Q.reducedBloch(encoded, 1);
+    ok(approx(r0.len, 0) && approx(r1.len, 0),
+       'superdense ' + msg + ': after encoding both reduced Bloch lengths are 0 (no local trace of the message)');
+    // ...and the pair stays maximally entangled until the decode
+    ok(approx(Q.concurrence(encoded), 1) && Q.isEntangled(encoded),
+       'superdense ' + msg + ': the encoded state is still maximally entangled (concurrence 1)');
+
+    // stage 3 — decode: exactly +1 on |msg>, 0 elsewhere (no stray phase at all)
+    const fin = Q.runOps(circ, 2);
+    ok(fin.every((a, i) => approx(a.re, i === idx ? 1 : 0) && approx(a.im, 0)),
+       'superdense ' + msg + ': decode lands on exactly +|' + msg + '> (amplitude +1, not even a global phase)');
+    ok(approx(Q.probabilities(fin)[idx], 1),
+       'superdense ' + msg + ': Bob reads both bits with certainty (P(|' + msg + '>) = 1)');
+    ok(approx(Q.concurrence(fin), 0) && !Q.isEntangled(fin),
+       'superdense ' + msg + ': the decode disentangles into a basis state (concurrence 0)');
+
+    // honesty: composed only from gates the simulator actually has
+    ok(circ.every((op) => ['H', 'X', 'Z', 'CNOT'].includes(op.gate)),
+       'superdense ' + msg + ': built only from H, X, Z, CNOT (no hidden gate)');
+
+    // the runner reports the same physics
+    const run = Q.superdenseRun(msg);
+    ok(run.index === idx && approx(run.pMessage, 1),
+       'superdense ' + msg + ': superdenseRun reports index ' + idx + ' with pMessage = 1');
+  }
+
+  // the four encoded states are mutually orthogonal — the whole reason two
+  // bits fit: orthogonal states are perfectly distinguishable
+  {
+    const states = Q.SUPERDENSE_MESSAGES.map((m) => {
+      const c2 = Q.superdenseCircuit(m);
+      return Q.runOps(c2.slice(0, c2.length - 2), 2);
+    });
+    let allOrth = true;
+    for (let i = 0; i < 4; i++)
+      for (let j = i + 1; j < 4; j++)
+        if (!approx(Q.fidelity(states[i], states[j]), 0)) allOrth = false;
+    ok(allOrth, 'superdense: the four encoded Bell states are mutually orthogonal (all 6 pairwise fidelities 0)');
+  }
+
+  // no-signalling on actual counts: the phase-flip message (10) gives joint
+  // statistics IDENTICAL to the untouched Bell pair — same seed, same counts
+  // — so Bob learns nothing until the qubit arrives and is decoded
+  {
+    const bell = Q.runOps([H0, CN01], 2);
+    const c10 = Q.superdenseCircuit('10');
+    const enc10 = Q.runOps(c10.slice(0, c10.length - 2), 2);
+    const a = Q.measureShots(bell, 1000, 42);
+    const b = Q.measureShots(enc10, 1000, 42);
+    ok(JSON.stringify(a.counts) === JSON.stringify(b.counts),
+       'superdense: encoded "10" shot counts are identical to the plain Bell pair (' +
+       JSON.stringify(b.counts) + ') — the message is invisible before the decode');
+  }
+
+  // 1000 seeded shots after the full protocol all read the message
+  {
+    const m = Q.measureShots(Q.superdenseRun('01').state, 1000, 42);
+    ok(m.counts['01'] === 1000 && m.counts['00'] + m.counts['10'] + m.counts['11'] === 0,
+       'superdense: 1000 seeded shots after the decode ALL read the message (certainty, not statistics)');
+  }
+
+  // determinism: two runs give bit-identical amplitudes
+  {
+    const g1 = Q.superdenseRun('11'), g2 = Q.superdenseRun('11');
+    ok(g1.state.every((a, i) => a.re === g2.state[i].re && a.im === g2.state[i].im),
+       'superdense: deterministic — two runs give bit-identical amplitudes');
+  }
+
+  // norm preserved through every step of every message circuit
+  {
+    let worst = 0;
+    for (const m of Q.SUPERDENSE_MESSAGES) {
+      let s = Q.zeroState(2);
+      for (const op of Q.superdenseCircuit(m)) {
+        s = Q.applyOp(s, op);
+        worst = Math.max(worst, Math.abs(Q.norm(s) - 1));
+      }
+    }
+    ok(worst <= 1e-10,
+       'superdense: norm preserved at every step of all four message circuits (drift ' + worst.toExponential(2) + ')');
+  }
+
+  // unknown message must throw, not mis-encode
+  {
+    let threw = false;
+    try { Q.superdenseEncodeOps('2'); } catch (e) { threw = true; }
+    ok(threw, 'superdense: superdenseEncodeOps rejects an unknown message');
+  }
+}
+
 /* ---------- summary ---------- */
 console.log('');
 console.log(pass + ' passed, ' + fail + ' failed');

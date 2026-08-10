@@ -376,6 +376,79 @@ const QSim = (() => {
     };
   }
 
+  /* ---------------- superdense coding (2 classical bits via 1 sent qubit) --
+   * Alice must deliver TWO classical bits to Bob but may transmit only ONE
+   * qubit. A lone qubit cannot do that — a measurement yields at most one
+   * classical bit (Holevo's bound). The way around is a resource prepared
+   * earlier: a Bell pair the two ALREADY SHARE — q0 in Alice's hands, q1 in
+   * Bob's.
+   *
+   *   share : H, CNOT               -> (|00> + |11>)/sqrt2   (in advance)
+   *   encode: Alice, on q0 ONLY     -> X if the right message bit is 1,
+   *                                    then Z if the left message bit is 1.
+   *           The four results are exactly the four Bell states — mutually
+   *           orthogonal, which is why two bits fit:
+   *             00 -> (|00>+|11>)/sqrt2      01 -> (|01>+|10>)/sqrt2
+   *             10 -> (|00>-|11>)/sqrt2      11 -> (|01>-|10>)/sqrt2
+   *   send  : the qubit travels — transport, not a gate; nothing to compute.
+   *   decode: Bob rotates the Bell basis onto the computational basis with
+   *           CNOT then H (this simulator measures only in the 0/1 basis, so
+   *           the "Bell measurement" is honestly BUILT that way, the standard
+   *           construction) and measures both qubits: exactly |b0 b1>, with
+   *           certainty — the final amplitude is +1 on the message state,
+   *           not even a global phase left over.
+   *
+   * Everything is COMPOSED from gates the simulator already has (H, X, Z,
+   * CNOT); no new physics is defined here.
+   *
+   * The honest heart of the protocol: Alice's encoding is LOCAL — she only
+   * touches her own qubit — yet it steers the JOINT state between four
+   * orthogonal states. Locally it is invisible: after any of the four
+   * encodings each qubit alone is maximally mixed (reduced Bloch length 0),
+   * and the phase-flip message even leaves the joint counts identical to the
+   * untouched Bell pair. No signal moves until the qubit physically arrives
+   * — entanglement plus local gates is not faster-than-light messaging.
+   *
+   * HONEST SCOPE: two qubits are used in total — one of them was shipped
+   * ahead of time as shared entanglement, before the message existed.
+   * Superdense coding doubles the classical capacity of the one qubit Alice
+   * SENDS, given that resource; it does not pack two bits into an isolated
+   * qubit and it does not beat Holevo's bound. What is verifiable here is
+   * the mechanism, not a communication miracle.
+   */
+  const SUPERDENSE_MESSAGES = ['00', '01', '10', '11'];
+  const gZ = (q) => ({ gate: 'Z', target: q });
+  // Alice's local encoding: gates on q0 only — I, X, Z or Z·X. Maps the
+  // shared pair onto the four Bell states, one per 2-bit message.
+  function superdenseEncodeOps(message) {
+    if (SUPERDENSE_MESSAGES.indexOf(message) < 0)
+      throw new Error('unknown superdense message: ' + message);
+    const ops = [];
+    if (message.charAt(1) === '1') ops.push(gX(0));
+    if (message.charAt(0) === '1') ops.push(gZ(0));
+    return ops;
+  }
+  // Full protocol: share the Bell pair, encode locally, (send q0), decode via
+  // the CNOT+H basis rotation. The first two ops are the share stage and the
+  // last two the decode stage — the lesson and the tests slice on that.
+  function superdenseCircuit(message) {
+    return [
+      gH(0), { gate: 'CNOT', control: 0, target: 1 },  // share (in advance)
+      ...superdenseEncodeOps(message),                 // Alice: local, q0 only
+      { gate: 'CNOT', control: 0, target: 1 }, gH(0),  // Bob: Bell measurement
+    ];
+  }
+  function superdenseRun(message) {
+    const state = runOps(superdenseCircuit(message), 2);
+    const index = parseInt(message, 2); // q0 is the left bit: index = q0·2 + q1
+    return {
+      message: message,
+      index: index,
+      state: state,
+      pMessage: probabilities(state)[index],
+    };
+  }
+
   /* ---------------- formatting ---------------- */
   const fmt = (x, d) => {
     const dd = (d === undefined) ? 3 : d;
@@ -489,6 +562,9 @@ const QSim = (() => {
     // Grover's search (likewise composed from H, X, CNOT only)
     GROVER_ITEMS: GROVER_ITEMS, groverOracle: groverOracle,
     groverDiffusion: groverDiffusion, groverCircuit: groverCircuit, groverRun: groverRun,
+    // superdense coding (likewise composed from H, X, Z, CNOT only)
+    SUPERDENSE_MESSAGES: SUPERDENSE_MESSAGES, superdenseEncodeOps: superdenseEncodeOps,
+    superdenseCircuit: superdenseCircuit, superdenseRun: superdenseRun,
     // formatting + explainer
     fmt: fmt, fmtComplex: fmtComplex, degOf: degOf, describeStep: describeStep,
   };

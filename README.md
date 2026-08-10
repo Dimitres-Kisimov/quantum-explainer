@@ -14,7 +14,7 @@ cited to a real source (references below and in the app footer).
 
 ## What's inside
 
-- **A hand-written state-vector simulator** (`sim.js`, ~300 lines, zero
+- **A hand-written state-vector simulator** (`sim.js`, ~550 lines, zero
   dependencies): complex arithmetic, H/X/Y/Z/S/T gates, RX/RY/RZ rotations
   with an angle slider, CNOT, Born-rule measurement with a seeded PRNG so runs
   are reproducible, and an entanglement check (the a₀₀a₁₁ − a₀₁a₁₀ product
@@ -63,7 +63,18 @@ cited to a real source (references below and in the app footer).
   (all ½ → sign flip on the mark, probabilities unchanged → inversion about
   the mean piles everything onto the answer), plus the honest twists that the
   query alone changes no probabilities and that running the iteration twice
-  overshoots back to 25%. Plus a "What quantum
+  overshoots back to 25% — and **superdense coding**: two classical bits
+  delivered through one transmitted qubit, using a Bell pair shared in
+  advance. Alice encodes by touching *only her own qubit* (I, X, Z or X-then-Z
+  map the pair onto the four mutually orthogonal Bell states); Bob decodes
+  with the CNOT+H basis rotation — an honest Bell measurement, since the
+  simulator only measures in the 0/1 basis — and reads both bits with
+  certainty. The lesson's honesty demos: the encoded pair is *locally
+  invisible* (both reduced Bloch arrows sit at the centre, and the phase-flip
+  message's 1000-shot counts are identical to the plain Bell pair with the
+  same seed — no-signalling made concrete), and the scope is stated plainly:
+  two qubits are used in total, one shipped ahead as entanglement, so
+  Holevo's bound is respected, not beaten. Plus a "What quantum
   computers are NOT" section covering the parallel-worlds myth, NISQ-era
   limits, decoherence, error-correction overhead, and why your encryption is
   not being broken today — and a "where they may genuinely help" section with
@@ -101,9 +112,9 @@ Everything is checkable from a stock Node installation:
 
 ```
 node --check sim.js app.js selftest.js sw.js   # syntax
-node test/sim.test.mjs               # 154 physics/behaviour assertions
-node selftest.js                     # portable correctness self-test (46 checks)
-node tools/verify.mjs                # manifest, precache, offline guard (86 checks)
+node test/sim.test.mjs               # 201 physics/behaviour assertions
+node selftest.js                     # portable correctness self-test (53 checks)
+node tools/verify.mjs                # manifest, precache, offline guard (93 checks)
 ```
 
 **In-browser self-test.** A teaching tool should be able to prove — on the
@@ -114,9 +125,12 @@ the same correctness suite (`selftest.js`) live against the real simulator: stat
 vectors stay normalized (probabilities sum to 1), the standard gates are unitary
 (U†U = I), H|0⟩ → 50/50, X|0⟩ → |1⟩, H·H|0⟩ → |0⟩ (interference), the Bell
 circuit gives {00: 0.5, 11: 0.5} with 01/10 impossible and a non-factorable
-state, seeded measurement frequencies match the Born rule |amplitude|², and
+state, seeded measurement frequencies match the Born rule |amplitude|²,
 Grover's one-query search finds each of the four markable items with
-certainty (while the query alone leaves every probability at 25%). The
+certainty (while the query alone leaves every probability at 25%), and
+superdense coding delivers all four 2-bit messages with certainty while the
+encoded pair stays locally invisible (reduced Bloch length 0; counts
+identical to the plain Bell pair before the decode). The
 result is also on `window.__selftest` and the `<html data-selftest>` attribute
 for scripting. It is deterministic (the only sampling uses a fixed seed) and is
 a portable subset of the exhaustive Node harness, not a replacement for it — the
@@ -143,7 +157,16 @@ amplitude to the inversion-about-the-mean value (mean exactly ¼); one
 iteration lands on the marked basis state with probability exactly 1 (1000
 seeded shots all agree); a second iteration overshoots back to exactly 25%;
 and the whole circuit is composed from H, X and CNOT only (the CZ inside is
-H·CNOT·H — no new gate primitive). The verifier proves the app references no
+H·CNOT·H — no new gate primitive). For superdense coding it checks all four
+messages with hand-computed amplitudes at every stage: the shared pair is
+exactly (1/√2, 0, 0, 1/√2); Alice's local encoding (X/Z on q0 only — the
+tests assert nothing ever touches q1) lands on the exact amplitudes of the
+four Bell states, which are verified mutually orthogonal (all six pairwise
+fidelities 0); after the encoding both reduced Bloch vectors have length 0
+and the phase-flip message's seeded counts are identical to the untouched
+Bell pair (no-signalling on actual counts, not just in prose); and the
+decode lands on exactly +1·|message⟩ — no global phase — so 1000 seeded
+shots all read the message. The verifier proves the app references no
 external asset of any kind.
 
 `tools/make_icons.py` (Python + Pillow) regenerates the PNG icons from the
@@ -188,6 +211,9 @@ q0 = 1, q1 = 0, and basis index = q0·2 + q1.
    Proc. 28th ACM STOC (1996). arXiv:quant-ph/9605043.
 8. D. Deutsch and R. Jozsa, "Rapid solution of problems by quantum
    computation", Proc. R. Soc. Lond. A 439, 553 (1992).
+9. C. H. Bennett and S. J. Wiesner, "Communication via one- and two-particle
+   operators on Einstein-Podolsky-Rosen states", Phys. Rev. Lett. 69, 2881
+   (1992).
 
 ## License
 

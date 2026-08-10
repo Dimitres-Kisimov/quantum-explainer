@@ -756,6 +756,13 @@ const PRESETS = {
   // running it twice overshoots back to 25% — the lesson's honesty demo.
   'grover-10':        { n: 2, ops: Q.groverCircuit('10', 1), run: true },
   'grover-overshoot': { n: 2, ops: Q.groverCircuit('10', 2), run: true },
+  // Superdense coding — the exact circuits the tests verify. The full protocol
+  // decodes Alice's two bits with certainty (all 1000 shots read the message);
+  // the 'hidden' preset stops before Bob's decode: the encoded pair's counts
+  // are identical to the plain Bell pair (same seed) — the lesson's
+  // no-signalling demo.
+  'superdense-10':     { n: 2, ops: Q.superdenseCircuit('10'), run: true },
+  'superdense-hidden': { n: 2, ops: Q.superdenseCircuit('10').slice(0, -2), run: true },
 };
 function loadPreset(name) {
   const p = PRESETS[name];
@@ -834,7 +841,7 @@ function renderSelfTest() {
   lede.className = 'small muted';
   lede.textContent = 'Every check below runs the real simulator (sim.js) live in this ' +
     'browser and asserts a known quantum fact. Deterministic: the only sampling uses a ' +
-    'fixed seed. The exhaustive proof is the 154-assertion Node harness (test/sim.test.mjs); ' +
+    'fixed seed. The exhaustive proof is the 201-assertion Node harness (test/sim.test.mjs); ' +
     'this is its portable core, so the math can be verified on any device with no tooling.';
   panel.appendChild(lede);
 
