@@ -257,7 +257,7 @@ function opLabel(op) {
 function renderCircuit() {
   const box = $('circuitBox');
   box.textContent = '';
-  const colW = 48, x0 = 104;
+  const colW = 50, x0 = 104; // drafting spacing: 16px air around each 34px gate box
   const w = Math.max(240, x0 + ops.length * colW + 16);
   const h = nQubits * 54 + 26 + (ops.length ? 18 : 0); // bottom strip hosts the per-step × controls
   const svg = document.createElementNS(SVGNS, 'svg');
@@ -322,7 +322,7 @@ function renderCircuit() {
       const r = document.createElementNS(SVGNS, 'rect');
       r.setAttribute('x', cx - 17); r.setAttribute('y', y - 17);
       r.setAttribute('width', 34); r.setAttribute('height', 34);
-      r.setAttribute('rx', 7);
+      r.setAttribute('rx', 6);
       r.setAttribute('class', 'cbox');
       g.appendChild(r);
       const t = text(cx, y + 5, op.gate, 'cboxtext');
@@ -406,6 +406,21 @@ function renderExplain() {
 }
 
 /* ---------- amplitudes + entanglement check ---------- */
+/* Phase → hue. The amplitude bars and the dial arrows wear their phase as a
+ * hue on an equal-loudness oklch wheel: --phase-l / --phase-c (styles.css)
+ * fix lightness and chroma per theme, so only the hue turns with the angle.
+ * Anchored so phase 0 wears the app's indigo accent hue and turns the same
+ * way as the dial (counter-clockwise positive): +90° lands on cyan-teal,
+ * 180° on gold, −90° on rose. The tint is a redundant encoding on purpose —
+ * the dial angle and the printed amplitude stay the exact ones; the hue only
+ * makes "this branch points backwards" visible at a glance. Deterministic,
+ * and browsers without oklch() simply keep the accent fallback. */
+const PHASE_HUE_AT_ZERO = 277; // oklch hue of the indigo accent family
+function phaseTint(rad) {
+  const deg = rad * 180 / Math.PI;
+  const hue = ((PHASE_HUE_AT_ZERO - deg) % 360 + 360) % 360;
+  return 'oklch(var(--phase-l) var(--phase-c) ' + hue.toFixed(1) + 'deg)';
+}
 /* Phase dial: one amplitude drawn as an arrow in the complex plane.
  * Length = magnitude (full radius = 1), angle = atan2(im, re): 0° points
  * right, counter-clockwise is positive — so the -0.707 on |1⟩ after H,Z
@@ -451,10 +466,12 @@ function phaseDial(a) {
     arrow.setAttribute('x1', 12); arrow.setAttribute('y1', 12);
     arrow.setAttribute('x2', x2); arrow.setAttribute('y2', y2);
     arrow.setAttribute('class', 'dialarrow');
+    arrow.style.stroke = phaseTint(rad); // hue = angle; class accent is the fallback
     dial.appendChild(arrow);
     const tip = document.createElementNS(SVGNS, 'circle');
     tip.setAttribute('cx', x2); tip.setAttribute('cy', y2); tip.setAttribute('r', 1.8);
     tip.setAttribute('class', 'dialtip');
+    tip.style.fill = phaseTint(rad);
     dial.appendChild(tip);
   }
   return dial;
@@ -481,6 +498,11 @@ function renderAmps() {
     const fill = document.createElement('div');
     fill.className = 'fill';
     fill.style.width = (probs[i] * 100).toFixed(2) + '%';
+    if (Q.cabs(a) >= 5e-4) { // same zero threshold as the dial
+      const deg = Math.round(Q.carg(a) * 180 / Math.PI);
+      fill.style.background = phaseTint(Q.carg(a));
+      bar.title = 'probability ' + (probs[i] * 100).toFixed(1) + '% · phase ' + deg + '°';
+    }
     bar.appendChild(fill);
     const pct = document.createElement('span');
     pct.className = 'pct mono';
@@ -518,8 +540,10 @@ function projFactory(w) {
     },
   };
 }
-function strokeCircle3D(ctx, pr, fn, colFront, colBack) {
-  // fn(t) -> [x,y,z]; draw front/back segments separately
+function strokeCircle3D(ctx, pr, fn, col, aFront, aBack) {
+  // fn(t) -> [x,y,z]; draw front/back segments separately. The circle color
+  // comes from the theme tokens (front brighter than back via alpha), so the
+  // sphere reframes itself for paper/night without hardcoded grays.
   const N = 72;
   for (const front of [false, true]) {
     ctx.beginPath();
@@ -531,9 +555,11 @@ function strokeCircle3D(ctx, pr, fn, colFront, colBack) {
         if (pen) ctx.lineTo(s.x, s.y); else { ctx.moveTo(s.x, s.y); pen = true; }
       } else pen = false;
     }
-    ctx.strokeStyle = front ? colFront : colBack;
+    ctx.strokeStyle = col;
+    ctx.globalAlpha = front ? aFront : aBack;
     ctx.stroke();
   }
+  ctx.globalAlpha = 1;
 }
 function drawArrow(ctx, pr, v, color, label) {
   const tip = pr.p(v.x, v.y, v.z);
@@ -582,10 +608,9 @@ function drawBloch(sweepState) {
   ctx.beginPath(); ctx.arc(pr.cx, pr.cy, pr.R, 0, 2 * Math.PI); ctx.stroke();
   // great circles: equator + two meridians (front brighter than back)
   ctx.lineWidth = 1; ctx.globalAlpha = 1;
-  const front = 'rgba(128,134,158,0.55)', back = 'rgba(128,134,158,0.18)';
-  strokeCircle3D(ctx, pr, (t) => [Math.cos(t), Math.sin(t), 0], front, back);
-  strokeCircle3D(ctx, pr, (t) => [Math.cos(t), 0, Math.sin(t)], front, back);
-  strokeCircle3D(ctx, pr, (t) => [0, Math.cos(t), Math.sin(t)], front, back);
+  strokeCircle3D(ctx, pr, (t) => [Math.cos(t), Math.sin(t), 0], mut, 0.5, 0.16);
+  strokeCircle3D(ctx, pr, (t) => [Math.cos(t), 0, Math.sin(t)], mut, 0.5, 0.16);
+  strokeCircle3D(ctx, pr, (t) => [0, Math.cos(t), Math.sin(t)], mut, 0.5, 0.16);
   // axes + labels
   ctx.font = '11px system-ui, sans-serif';
   ctx.fillStyle = mut;

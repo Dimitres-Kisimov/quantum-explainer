@@ -10,6 +10,11 @@
  *      (no src=/href= to http(s), no @import, no url(http...), no @font-face,
  *      no CDN hostnames, no fetch/XHR/WebSocket/beacon to remote URLs).
  *   4. Every local src=/href= reference in index.html resolves to a file.
+ *   5. Design system: both theme token blocks parse, the visual-pass tokens
+ *      exist, every text token pair meets WCAG AA (4.5:1) in BOTH themes
+ *      (computed here from the hex values in styles.css, not eyeballed),
+ *      the phase-hue wheel + interference motif are wired, all motion sits
+ *      behind prefers-reduced-motion, and the sw cache version matches.
  * Exit code 0 only if everything passes.
  */
 import { readFileSync, existsSync } from 'node:fs';
@@ -151,6 +156,74 @@ ok(/superdenseRun|superdenseCircuit/.test(selftest),
    'selftest.js exercises superdense coding (browser + Node stay in sync)');
 for (const ref of ['1801.00862', '1905.09749', 'Nielsen', 'Preskill', 'learning\\.quantum\\.ibm\\.com', 'Deutsch', 'Wiesner']) {
   ok(new RegExp(ref).test(html), 'reference present in page: ' + ref.replace('\\\\', '\\'));
+}
+
+/* ---------- 5. design system: theme tokens + AA contrast ---------- */
+const css = read('styles.css');
+const lightBlockM = css.match(/:root\s*\{([\s\S]*?)\}/);
+const darkBlockM = css.match(/@media \(prefers-color-scheme: dark\)\s*\{\s*:root\s*\{([\s\S]*?)\}/);
+ok(!!lightBlockM, 'styles.css defines the light (paper notebook) token block');
+ok(!!darkBlockM, 'styles.css defines the dark (night lab) token block');
+const tokensOf = (block) => {
+  const t = {};
+  for (const m of (block || '').matchAll(/--([a-z0-9-]+)\s*:\s*([^;]+);/gi)) t[m[1]] = m[2].trim();
+  return t;
+};
+const lightT = tokensOf(lightBlockM && lightBlockM[1]);
+const darkT = tokensOf(darkBlockM && darkBlockM[1]);
+for (const tok of ['accent-fill', 'on-accent', 'phase-l', 'phase-c', 'wire', 'baseline', 'fringe', 'serif']) {
+  ok(tok in lightT, 'design token --' + tok + ' is defined');
+}
+const redefined = Object.keys(darkT).filter((k) => k in lightT).length;
+ok(redefined >= 18, 'dark theme redefines the full color token set (' + redefined + ' tokens)');
+
+/* WCAG AA, computed from the tokens themselves — the design's contract that
+ * both themes are built with equal care. All checked pairs are used as
+ * TEXT somewhere in the app, so the bar is 4.5:1, not the 3:1 graphics bar. */
+const relLum = (hex) => {
+  const v = hex.replace('#', '');
+  const [r, g, b] = [0, 2, 4]
+    .map((i) => parseInt(v.slice(i, i + 2), 16) / 255)
+    .map((c) => (c <= 0.04045 ? c / 12.92 : ((c + 0.055) / 1.055) ** 2.4));
+  return 0.2126 * r + 0.7152 * g + 0.0722 * b;
+};
+const contrast = (a, b) => {
+  const [hi, lo] = [relLum(a), relLum(b)].sort((x, y) => y - x);
+  return (hi + 0.05) / (lo + 0.05);
+};
+const AA_PAIRS = [
+  ['fg', 'panel'], ['muted', 'panel'], ['accent', 'panel'], ['accent2', 'panel'],
+  ['fg', 'bg'], ['muted', 'bg'], ['on-accent', 'accent-fill'],
+];
+for (const [mode, T] of [['light', lightT], ['dark', Object.assign({}, lightT, darkT)]]) {
+  for (const [a, b] of AA_PAIRS) {
+    const isHex = (h) => /^#[0-9a-f]{6}$/i.test(h || '');
+    const c = isHex(T[a]) && isHex(T[b]) ? contrast(T[a], T[b]) : 0;
+    ok(c >= 4.5, mode + ' AA: --' + a + ' on --' + b + ' = ' + c.toFixed(2) + ':1 (>= 4.5)');
+  }
+}
+
+/* the signature artifacts stay wired the way the design intends */
+ok(/oklch\(var\(--phase-l\) var\(--phase-c\)/.test(appjs),
+   'amplitude bars + dial arrows tint phase via the equal-loudness oklch wheel');
+ok(/repeating-radial-gradient/.test(css) && /var\(--fringe\)/.test(css),
+   'two-source interference motif present, contrast controlled by --fringe');
+ok(/border-left: 2px solid var\(--baseline\)/.test(css),
+   'bars grow from the shared 2px ink baseline');
+ok(/@media \(prefers-reduced-motion: no-preference\)[\s\S]*?\.bar \.fill[^}]*transition/.test(css),
+   'bar/toast/control motion lives inside the reduced-motion guard');
+ok((css.match(/transition:/g) || []).length ===
+   ((css.match(/@media \(prefers-reduced-motion: no-preference\)\s*\{[\s\S]*?\n\}/) || [''])[0].match(/transition:/g) || []).length,
+   'no transition is declared outside the reduced-motion guard');
+ok(/max-width: 65ch/.test(css), 'lesson prose measures 65ch');
+ok(/var\(--serif\)/.test(css), 'reading serif applied through the --serif token');
+ok(/quantum-explainer-v9/.test(sw), 'sw.js cache is at v9 (visual pass shipped)');
+const themeMetas = [...html.matchAll(/name="theme-color" content="(#[0-9a-f]{6})" media="\(prefers-color-scheme: (light|dark)\)"/g)];
+ok(themeMetas.length === 2, 'index.html declares light + dark theme-color metas');
+for (const m of themeMetas) {
+  const want = (m[2] === 'light' ? lightT.bg : darkT.bg) || '';
+  ok(m[1].toLowerCase() === want.toLowerCase(),
+     'theme-color (' + m[2] + ') matches the --bg token ' + want);
 }
 
 /* ---------- summary ---------- */

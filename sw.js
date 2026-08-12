@@ -6,7 +6,7 @@
  */
 'use strict';
 
-const VERSION = 'quantum-explainer-v8';
+const VERSION = 'quantum-explainer-v9';
 const PRECACHE = [
   './',
   './index.html',

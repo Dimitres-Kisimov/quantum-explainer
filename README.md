@@ -114,7 +114,7 @@ Everything is checkable from a stock Node installation:
 node --check sim.js app.js selftest.js sw.js   # syntax
 node test/sim.test.mjs               # 201 physics/behaviour assertions
 node selftest.js                     # portable correctness self-test (53 checks)
-node tools/verify.mjs                # manifest, precache, offline guard (93 checks)
+node tools/verify.mjs                # manifest, precache, offline guard, design-token AA contrast (129 checks)
 ```
 
 **In-browser self-test.** A teaching tool should be able to prove — on the

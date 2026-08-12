@@ -31,7 +31,7 @@ jobs:
       - name: Run the portable correctness self-test (also the in-browser ?selftest=1 suite)
         run: node selftest.js
 
-      - name: Run structural + offline verifier (93 checks)
+      - name: Run structural + offline verifier (129 checks, incl. design-token AA contrast)
         run: node tools/verify.mjs
 
       - name: Offline guard — no external asset references in app files
